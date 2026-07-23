@@ -100,11 +100,21 @@ def suggest_tags(cand) -> list:
     tags.add("library")
     tags.add("open-source")
 
-    # Extract from docstring
+    # Extract from docstring (with noise filtering)
+    _tag_noise = {
+        "the", "this", "that", "module", "class", "function",
+        "and", "for", "with", "from", "file", "import", "export",
+        "const", "let", "var", "return", "package", "provides",
+        "dict", "list", "tuple", "set", "str", "int", "float",
+        "bool", "none", "true", "false", "def", "self", "cls",
+        "type", "args", "kwargs", "data", "value", "values",
+        "also", "can", "has", "not", "are", "was", "were",
+        "will", "should", "could", "would", "does", "than",
+    }
     if cand.docstring_snippet:
         for word in cand.docstring_snippet.lower().split():
             w = word.strip(".,;:!?()[]{}'")
-            if 3 < len(w) < 20 and w.isalpha():
+            if 3 < len(w) < 20 and w.isalpha() and w not in _tag_noise:
                 tags.add(w)
 
     # Cap at 8 tags, prioritize specific ones
