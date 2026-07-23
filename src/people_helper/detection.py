@@ -254,6 +254,9 @@ def _extract_what_it_does(docstring: str, first_lines: str, path: str) -> str:
                 continue
             if re.match(r'^[~\-=]+$', cleaned):
                 continue
+            # Skip JSDoc / annotation lines that start with @
+            if cleaned.startswith('@'):
+                continue
             if re.match(r'^[\w.]+$', cleaned) and '.' in cleaned and not any(w in cleaned.lower() for w in ('provides', 'implements', 'contains', 'handles', 'manages', 'offers')):
                 continue
             if len(cleaned) > 200:
