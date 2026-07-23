@@ -124,7 +124,7 @@ For each candidate, compute three scores (0-10):
 - **Uniqueness**: based on GitHub search results count (0 results = 8, 1-2 = 6, 3-5 = 4, 6+ = 2)
 - **Ship effort**: LOC < 50 = 1.5h, < 150 = 3h, < 300 = 6h, 300+ = 16h
 
-Combined score: `0.4 * open_sourceability + 0.4 * uniqueness + 0.2 * (10 - normalize(ship_effort))`
+Combined score: `0.5 * open_sourceability + 0.3 * uniqueness + 0.2 * (10 - normalize(ship_effort))`
 
 ### Step 5: Search GitHub for each candidate
 For each top-scoring candidate:
