@@ -224,7 +224,7 @@ def is_internal_import(line: str, project_files: set) -> int:
     """
     Return 1 if `line` looks like an internal project import, 0 otherwise.
     Heuristic: matches common patterns and checks if the imported name
-    matches any file in the project.
+    matches any file in the project. Detects path aliases (@/, ~/) for JS/TS.
     """
     # Python
     m = re.match(r"^\s*from\s+([\w.]+)\s+import", line)
@@ -237,10 +237,30 @@ def is_internal_import(line: str, project_files: set) -> int:
         mod = m.group(1).split(".")[0]
         if mod in project_files or any(mod in pf for pf in project_files):
             return 1
-    # JS/TS
-    m = re.match(r"^\s*import\s+.*from\s+['\"]([\w./-]+)", line)
+    # JS/TS — relative paths and path aliases
+    m = re.match(r"^\s*import\s+.*from\s+['\"]([\w./@\-\~]+)", line)
     if m:
-        if m.group(1).startswith(".") or m.group(1).startswith("/"):
+        path = m.group(1)
+        # Relative: ./ ../  / (root alias)
+        if path.startswith(".") or path.startswith("/"):
+            return 1
+        # Path aliases: @/ or @scope/ or ~/
+        if path.startswith("@/") or path.startswith("~/"):
+            return 1
+        # Scoped packages can be either internal (@/company/...) or external (@types/...)
+        # Heuristic: scoped packages with a single segment after @ are usually external (e.g. @types/node)
+        # Scoped packages with /lib/ or /components/ etc. are usually internal
+        if path.startswith("@") and "/" in path[1:]:
+            scope, rest = path[1:].split("/", 1)
+            # Treat scope as internal if it doesn't look like a known external scope
+            external_scopes = {"types", "angular", "vue", "react", "nestjs", "types"}
+            if scope not in external_scopes and not rest.startswith("types/"):
+                return 1
+    # require() with relative path
+    m = re.match(r'^\s*require\([\'"]([\w./@\-\~]+)[\'"]\)', line)
+    if m:
+        path = m.group(1)
+        if path.startswith(".") or path.startswith("/") or path.startswith("@/") or path.startswith("~/"):
             return 1
     # Go
     m = re.match(r'^\s*"([\w./\-]+)"', line)
@@ -271,6 +291,7 @@ def has_docstring(content: str, ext: str) -> tuple:
     """
     Return (has_docstring, snippet).
     Detects module-level docstrings for Python, JSDoc for JS/TS, doc comments for Go/Rust.
+    Also catches large // header blocks for TS/JS (a lot of code uses // instead of /** */).
     """
     lines = content.splitlines()
     if not lines:
@@ -288,14 +309,28 @@ def has_docstring(content: str, ext: str) -> tuple:
             return True, "\n".join(snippet_lines).strip()
 
     if ext in {".ts", ".tsx", ".js", ".jsx"}:
-        # Look for /** */ at the top
+        # JSDoc: /** ... */
         if lines[0].strip().startswith("/**"):
             snippet_lines = []
-            for line in lines[:20]:
+            for line in lines[:30]:
                 snippet_lines.append(line)
                 if line.strip().endswith("*/"):
                     break
             return True, "\n".join(snippet_lines).strip()
+        # Large // header block (5+ lines of // comments) — common in TS code
+        comment_block = []
+        for line in lines[:30]:
+            stripped = line.strip()
+            if stripped.startswith("//"):
+                comment_block.append(line)
+            elif stripped == "":
+                if len(comment_block) >= 5:
+                    break
+                continue
+            else:
+                break
+        if len(comment_block) >= 5:
+            return True, "\n".join(comment_block).strip()
 
     if ext == ".go":
         # Look for // comment block at top
@@ -329,15 +364,52 @@ def filename_score(path: str) -> float:
     """
     name = Path(path).stem.lower()
     score = 0.0
-    util_patterns = ["util", "helper", "common", "lib", "tool", "format", "parse", "convert", "validate", "sanitize"]
+    util_patterns = ["util", "helper", "common", "lib", "tool", "format", "parse", "convert", "validate", "sanitize", "protection", "guard", "filter", "normaliz"]
     for p in util_patterns:
         if p in name:
             score += 0.5
-    if name == "main" or name == "index" or name == "app" or name == "server":
-        score -= 1.0
+    # Framework route files — strongly negative
+    if name in {"route", "page", "layout", "loading", "error", "not-found", "middleware", "index", "main", "app", "server", "_app", "_document"}:
+        score -= 3.0
     if "test" in name or "spec" in name:
         score -= 2.0  # tests themselves
     return score
+
+
+def is_framework_route(path: str) -> bool:
+    """
+    Detect Next.js / Nuxt / SvelteKit / etc. route files that are NOT extractable.
+    These are tightly coupled to the framework and project.
+    """
+    p = Path(path)
+    parts = p.parts
+    # Next.js: anything in app/ or pages/ (with or without src/ prefix)
+    for i, part in enumerate(parts):
+        if part in {"app", "pages"} and i > 0:
+            # Check if there's a src/ before it, or it's the conventional location
+            prev = parts[i - 1] if i > 0 else ""
+            if prev in {"src", "."} or i == 0:
+                return True
+            # app/ or pages/ at root
+            if i == 0:
+                return True
+    # SvelteKit: routes/ directory
+    if "routes" in parts:
+        return True
+    # Nuxt: pages/ directory
+    if "pages" in parts:
+        return True
+    # File name itself is a framework special file
+    if p.name in {"route.ts", "route.tsx", "route.js", "route.jsx",
+                  "page.tsx", "page.jsx", "page.ts", "page.js",
+                  "layout.tsx", "layout.ts", "layout.jsx", "layout.js",
+                  "loading.tsx", "loading.ts", "loading.jsx", "loading.js",
+                  "error.tsx", "error.ts", "error.jsx", "error.js",
+                  "not-found.tsx", "not-found.ts", "middleware.ts", "middleware.js",
+                  "_app.tsx", "_app.jsx", "_document.tsx", "_document.jsx",
+                  "+page.svelte", "+layout.svelte", "+server.ts"}:
+        return True
+    return False
 
 
 def has_test_for(file_path: str, all_files: list) -> bool:
@@ -383,6 +455,10 @@ def detect_candidates(files: list, primary_language: str) -> list:
         if loc < 10 or loc > 500:
             continue
 
+        # Skip framework route files (Next.js, Nuxt, SvelteKit) — never extractable
+        if is_framework_route(path_str):
+            continue
+
         has_doc, doc_snippet = has_docstring(f["content"], ext)
         internal = sum(is_internal_import(line, file_set) for line in f["content"].splitlines())
         external = count_external_imports(f["content"])
@@ -401,7 +477,7 @@ def detect_candidates(files: list, primary_language: str) -> list:
             candidates.append(cand)
             continue
 
-        # Skip if filename strongly suggests app entry
+        # Skip if filename strongly suggests app entry or framework file
         if fscore < -0.5:
             continue
 
@@ -528,9 +604,35 @@ def score_candidate(cand: Candidate, similar_count: int) -> None:
 
 def suggest_name(cand: Candidate) -> str:
     """
-    Suggest a name based on the file path and content.
+    Suggest a name based on the file path, parent directory, and content.
+    Avoids generic names like 'route' or 'index'. Uses parent dir context
+    when the file name is too generic.
     """
-    stem = Path(cand.path).stem
+    p = Path(cand.path)
+    stem = p.stem
+    parent = p.parent.name
+
+    # Generic file names that should be augmented with parent context
+    generic_names = {"route", "index", "main", "app", "server", "utils", "util", "helpers", "common", "lib"}
+
+    if stem.lower() in generic_names and parent and parent not in {".", "src", "lib", "app"}:
+        # Use parent dir + a hint from the docstring or first content line
+        hint = ""
+        if cand.docstring_snippet:
+            # Try to find a noun in the docstring
+            words = re.findall(r"[A-Za-z][A-Za-z0-9-]{2,}", cand.docstring_snippet)
+            for w in words:
+                if w.lower() not in {"the", "this", "that", "module", "class", "function", "and", "for", "with", "from", "file", "import", "export", "const", "let", "var"}:
+                    hint = w.lower()
+                    break
+        if hint:
+            return re.sub(r"-+", "-", f"{parent}-{hint}")
+        return re.sub(r"[^a-z0-9-]", "-", parent.lower())
+    elif stem.lower() in generic_names:
+        # No useful parent context, just use stem
+        return re.sub(r"[^a-z0-9-]", "-", f"{parent}-{stem}".lower()) if parent != "." else "extracted-utility"
+
+    # Normal case: clean the file stem
     name = re.sub(r"[^a-z0-9-]", "-", stem.lower())
     name = re.sub(r"-+", "-", name).strip("-")
     return name or "extracted-utility"
