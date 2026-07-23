@@ -238,9 +238,17 @@ def has_test_for(file_path: str, all_files: set) -> bool:
 
 
 def _extract_what_it_does(docstring: str, first_lines: str, path: str) -> str:
+    # Lines that look like code, not descriptions
+    _code_prefixes = (
+        'from ', 'import ', 'const ', 'let ', 'var ', 'export ',
+        'require(', 'function ', 'def ', 'class ', 'async ',
+        'return ', 'if ', 'for ', 'while ', 'try:', 'except',
+        'with ', '@', '#!', 'package ', 'use ', 'mod ',
+    )
     if docstring:
         for line in docstring.splitlines():
-            cleaned = re.sub(r"^([\s*/#" + chr(39) + chr(34) + r"])+\s*", "", line).strip()
+            cleaned = re.sub(r"^[\s*/#" + chr(39) + chr(34) + r"]+\s*", "", line).strip()
+            cleaned = cleaned.rstrip(chr(39) + chr(34)).strip()
             # Skip decorative lines (tildes, dashes, equals) and module-path headers
             if not cleaned or len(cleaned) <= 5:
                 continue
@@ -251,14 +259,33 @@ def _extract_what_it_does(docstring: str, first_lines: str, path: str) -> str:
             if len(cleaned) > 200:
                 return cleaned[:197] + "..."
             return cleaned
-    for line in first_lines.splitlines()[:10]:
+    for line in first_lines.splitlines()[:15]:
         stripped = line.strip()
-        if stripped and not stripped.startswith(("#", "//", "/*", "*")):
-            if len(stripped) > 10:
-                if len(stripped) > 200:
-                    return stripped[:197] + "..."
-                return stripped
-    return f"File at {path}"
+        if not stripped:
+            continue
+        if stripped.startswith(("#", "//", "/*", "*")):
+            continue
+        # Skip import/export statements and code-like lines
+        if any(stripped.startswith(p) for p in _code_prefixes):
+            continue
+        # Skip quoted strings (function/method docstrings in code)
+        if stripped.startswith((chr(34)*3, chr(39)*3)):
+            continue
+        # Skip function signatures (e.g. "owner: str,")
+        if re.match(r'^[a-z_]\w*\s*[:=]', stripped) and len(stripped) < 60 and not any(c in stripped for c in '.!?'):
+            continue
+        # Skip assignment lines (e.g. "now = datetime.now(...)")
+        if re.match(r'^[a-z_]\w*\s*=\s*.+$', stripped) and len(stripped) > 15:
+            continue
+        # Skip lines that are mostly symbols/operators
+        alpha_ratio = sum(1 for c in stripped if c.isalpha()) / max(len(stripped), 1)
+        if alpha_ratio < 0.5:
+            continue
+        if len(stripped) > 10:
+            if len(stripped) > 200:
+                return stripped[:197] + "..."
+            return stripped
+    return f"Module at {path}"
 
 
 def _build_why_extractable(cand) -> list:
