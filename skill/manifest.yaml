@@ -1,0 +1,103 @@
+# People Helper skill manifest
+# This file describes the skill package for tooling that consumes it.
+
+name: people-helper
+version: 0.1.0
+description: >-
+  Find what is extractable from your private code as standalone side projects
+  or open source contributions. Reads a GitHub repository (fine-grained PAT,
+  read-only), identifies candidate components, searches GitHub for similar
+  projects, and produces a structured report with differentiators, suggested
+  names, and starter scaffolds.
+author: Ehsas317
+license: MIT
+homepage: https://github.com/Ehsas317/people-helper
+
+# Trust boundary: read-only by design.
+trust:
+  mode: read-only
+  pat:
+    type: fine-grained
+    required_scopes:
+      - Contents: Read
+      - Metadata: Read
+    forbidden_scopes:
+      - any write permission
+      - Administration
+      - Actions
+      - Workflows
+      - Issues
+      - Pull requests
+      - Projects
+      - Packages
+      - Pages
+      - any org-level scope
+  data_handling:
+    - code stays on user's machine
+    - only network calls are to api.github.com
+    - no third-party data transmission
+    - temp clone is cleaned up after analysis
+
+# Inputs the skill accepts
+inputs:
+  - name: repo
+    type: string
+    required: true
+    description: GitHub repo URL or owner/name
+  - name: max_candidates
+    type: integer
+    default: 10
+    description: Max extractables to surface
+  - name: min_stars
+    type: integer
+    default: 5
+    description: Min stars for similar projects to surface
+  - name: language
+    type: string
+    required: false
+    description: Filter to one language
+
+# Outputs the skill produces
+outputs:
+  - name: report
+    type: markdown
+    description: Structured markdown report with top candidates, scores, similar projects, differentiators, and starter scaffolds
+  - name: starter_scaffolds
+    type: code-blocks
+    description: First 30 lines of each top candidate, ready to lift out
+
+# Tools the skill needs
+tools:
+  required:
+    - read
+    - bash
+    - web_fetch
+    - glob
+    - grep
+  forbidden:
+    - write
+    - edit
+    - multi_edit
+    - notebook_edit
+    - git_push
+    - any GitHub write API
+
+# Platforms this skill package supports
+platforms:
+  - claude-skills       # SKILL.md
+  - openai-gpts         # platforms/gpt.md
+  - hermes              # platforms/hermes.yaml
+  - cursor              # platforms/cursor.md
+  - cline               # platforms/cline.md
+  - mcp                 # platforms/mcp.json
+
+# Triggers
+triggers:
+  - "analyze my repo"
+  - "find extractables"
+  - "what can I open source from my code"
+  - "scan my private repo"
+  - "people helper"
+  - "find side projects in my code"
+  - "open source opportunities"
+  - "what is worth shipping from this"

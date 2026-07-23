@@ -1,0 +1,107 @@
+{
+  "$schema": "https://openapi.guardsquare.com/mcp-schema.json",
+  "name": "people-helper",
+  "version": "0.1.0",
+  "description": "Read-only GitHub analysis. Find what is extractable from a private repo as side projects or open source contributions.",
+  "author": "Ehsas317",
+  "license": "MIT",
+  "homepage": "https://github.com/Ehsas317/people-helper",
+  "trust": {
+    "mode": "read-only",
+    "pat_required": true,
+    "pat_type": "fine-grained",
+    "pat_scopes_required": ["Contents: Read", "Metadata: Read"],
+    "forbidden_operations": [
+      "git_push",
+      "github_create_repo",
+      "github_create_issue",
+      "github_create_pr",
+      "github_update_file",
+      "github_delete_file",
+      "any write to the target repository"
+    ]
+  },
+  "tools": [
+    {
+      "name": "analyze_repo",
+      "description": "Analyze a GitHub repository and produce a People Helper report. Read-only.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "GitHub repo URL or owner/name"
+          },
+          "max_candidates": {
+            "type": "integer",
+            "default": 10,
+            "description": "Max extractables to surface"
+          },
+          "min_stars": {
+            "type": "integer",
+            "default": 5,
+            "description": "Min stars for similar projects"
+          },
+          "language": {
+            "type": "string",
+            "description": "Filter to one language (optional)"
+          }
+        },
+        "required": ["repo"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "report_markdown": {
+            "type": "string",
+            "description": "Full markdown report"
+          },
+          "top_candidates": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {"type": "string"},
+                "path": {"type": "string"},
+                "language": {"type": "string"},
+                "combined_score": {"type": "number"},
+                "open_sourceability": {"type": "number"},
+                "uniqueness": {"type": "number"},
+                "ship_effort_hours": {"type": "number"},
+                "suggested_name": {"type": "string"},
+                "suggested_license": {"type": "string"},
+                "similar_projects": {"type": "array"},
+                "differentiators": {"type": "array"}
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "resources": [
+    {
+      "uri": "skill://people-helper/SKILL.md",
+      "name": "Skill prompt",
+      "description": "The full system prompt for the People Helper skill"
+    },
+    {
+      "uri": "skill://people-helper/references/heuristics.md",
+      "name": "Heuristics reference",
+      "description": "Detailed extractable detection heuristics"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "analyze",
+      "description": "Run the People Helper analysis on a repository",
+      "arguments": [
+        {
+          "name": "repo",
+          "description": "GitHub repo URL or owner/name",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

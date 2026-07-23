@@ -27,3 +27,7 @@ __pycache__/
 dist/
 build/
 *.egg-info/
+
+# Generated skill archive (build with skill/build.sh)
+*.skill
+people-helper.skill
