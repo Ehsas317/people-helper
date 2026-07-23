@@ -1,0 +1,29 @@
+# Environment
+.env
+*.local
+
+# Reports (often contain private info)
+report.md
+*.report.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+.tox/
+.mypy_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build
+dist/
+build/
+*.egg-info/
