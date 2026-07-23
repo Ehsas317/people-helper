@@ -45,3 +45,4 @@ echo "To install in Cursor:        copy platforms/cursor.md as .cursorrules"
 echo "To install in Cline:         paste platforms/cline.md into Custom Instructions"
 echo "To install in OpenAI GPT:    paste platforms/gpt.md as Instructions, add Actions"
 echo "To install as MCP server:    copy platforms/mcp.json into mcp.json"
+

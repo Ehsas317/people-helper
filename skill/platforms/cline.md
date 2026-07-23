@@ -64,3 +64,4 @@ Concrete. Grounded. No hype. Honest about uncertainty. Skeptical of vanity metri
 | Auto-publish to PyPI | "Same. The skill is read-only." |
 | Run on my whole org | "Use one repo at a time. The PAT must be single-repo." |
 | Expand scope to write | "Not possible. Use a different workflow for shipping." |
+

@@ -1,88 +1,68 @@
-# People Helper — Detailed Heuristics
+# People Helper — Heuristics Reference
 
-This document is the reference for the extractable detection logic. The CLI in `scripts/people_helper.py` implements these heuristics directly. The skill prompt (in `SKILL.md`) summarizes them.
+## Scoring (v0.2)
 
-## Universal heuristics
-
-A source file is a **strong extractable** if it satisfies most of:
+### Code quality (50% weight)
 
 | Heuristic | Points | Notes |
 |---|---|---|
-| Has tests | +3 | Corresponding test file exists in `tests/`, `__tests__/`, or as `<name>_test.<ext>`, `<name>Test.<ext>`, `<name>.test.<ext>`, `<name>.spec.<ext>` |
-| Has docstring | +2 | Module-level docstring (Python), JSDoc (JS/TS), package comment (Go), `//!` (Rust) |
-| Zero internal imports | +2 | Doesn't import other modules from the same project |
-| ≤3 external imports | +2 | Small dependency footprint |
-| Utility filename | +1 | `util*`, `helper*`, `common*`, `lib*`, `tool*`, `format*`, `parse*`, `convert*`, `validate*`, `sanitize*` |
-| Not a CLI entry point | required | No `if __name__ == "__main__":`, no `func main()`, no `process.argv` reference |
-| No env var deps | required | Doesn't read `os.environ`, `process.env`, `std::env::var`, etc. for required config |
-| No external service deps | required | Doesn't connect to databases, HTTP APIs, or services at import time |
+| Has tests | +3 | Test file exists in tests/, __tests__/, or as name_test.*, nameTest.*, name.test.*, name.spec.* |
+| Has docstring | +2 | Module-level docstring (Python), JSDoc (JS/TS), package comment (Go/Rust), Javadoc (Java/C#) |
+| Zero internal imports | +2 | No imports from same project |
+| 1 internal import | +1 | Loosely coupled |
+| <=3 external imports | +2 | Small dependency footprint |
+| 4-5 external imports | +1 | Moderate |
+| Utility filename | +1 | util*, helper*, common*, lib*, tool*, format*, parse*, convert*, validate*, sanitize*, guard*, filter*, normaliz* |
 
-Open sourceability score = sum of applicable points, capped at 10.
+Capped at 10.
 
-## Per-language specifics
+### Uniqueness (30% weight)
 
-### Python
+| Similar results | Score |
+|---|---|
+| 0 | 8 |
+| 1-2 | 6 |
+| 3-5 | 4 |
+| 6+ | 2 |
 
-- Skip files matching `test_*`, `*_test.py`, `conftest.py`
-- Detect module-level docstring: first non-blank line is `"""` or `'''`
-- Detect internal imports: `from .{module}` (relative), `from <project_module>` (matches project files)
-- Skip `__init__.py` (rarely extractable)
-- Skip files in `migrations/`, `alembic/`, `scripts/`
+GitHub search filtered by: language, min 5 stars, pushed in last 24 months.
 
-### TypeScript / JavaScript
+### Demand signal (20% weight)
 
-- Skip `.test.ts`, `.spec.ts`, `__tests__/`
-- Detect JSDoc: first non-blank line is `/**`
-- Detect internal imports: `from './...'`, `from '../...'`, `from '@scope/...'`
-- Skip React component files (`.tsx` with JSX, default export that looks like a component)
-- Skip files in `pages/`, `app/`, `routes/` (Next.js style — usually app-specific)
+Computed from similar projects using log-scaled metrics:
+- Star signal: min(10, stars / 100)
+- Fork signal: min(5, forks / 50)
+- Issue signal: min(3, open_issues / 10)
 
-### Go
+Weighted by search rank (top result matters most). If no similar projects, defaults to 5.0 (moderate niche demand).
 
-- Skip `*_test.go`
-- Detect package comment: `// Package <name> ...` at top, or comment block before `package` declaration
-- Detect internal imports: unaliased paths without `/` in import path
-- Skip `main.go` and files with `package main` containing `func main()`
-- Skip `cmd/` directory entirely
+**Combined:** `0.5 * code_quality + 0.3 * uniqueness + 0.2 * demand_signal`
 
-### Rust
+## Detection heuristics
 
-- Skip files in `tests/`, `benches/`, `examples/`
-- Detect doc comments: `//!` at top of file (inner doc), `///` for items
-- Detect internal imports: `use crate::...`, `use super::...`, `use self::...`
-- Skip `main.rs` and `lib.rs` itself
-- Skip files with binary-only attributes (`#[tokio::main]`, etc.)
+### Universal
 
-### Java
+- 10-500 LOC (non-empty, non-comment lines)
+- Not a test file
+- Not a framework route file (Next.js pages, SvelteKit routes, etc.)
+- Not a CLI entry point
+- Not __init__.py, conftest.py
 
-- Skip `*Test.java`, `*Tests.java`
-- Detect Javadoc: `/** ... */` before class declaration
-- Detect internal imports: package paths matching project structure
-- Skip `Application.java`, `*Application.java`, `Main.java`
-- Skip files in `src/main/java/<company>/<app>/` that import Spring/J2EE heavily
+### Per-language
 
-### C / C++
+**Python:** Skip test_*, *_test.py, conftest.py, __init__.py, migrations/, alembic/. Detect `from .module` (relative) and project-name imports as internal.
 
-- Skip files in `test/`, `tests/`
-- Detect file header comment block
-- Detect internal includes: `#include "..."` with project-relative paths
-- Skip `main.c`, `main.cpp`, `main.cc`
-- Skip files heavily dependent on project-specific headers
+**TypeScript/JavaScript:** Skip .test.*, .spec.*, __tests__/. Detect `from './...'`, `from '@scope/...'` (non-external scope) as internal. Skip framework route files.
 
-## Scoring
+**Go:** Skip *_test.go, main.go, cmd/. Detect unaliased import paths (no domain) as internal.
 
-### Uniqueness
+**Rust:** Skip tests/, benches/, examples/, main.rs, lib.rs. Detect `use crate::`, `use super::`, `use self::` as internal.
 
-Based on GitHub search result count for the same language and ≥5 stars:
+**Java/Kotlin:** Skip *Test.java, Application.java, Main.java. Detect package paths matching project structure as internal.
 
-| Results | Score | Interpretation |
-|---|---|---|
-| 0 | 8 | Niche, no existing project |
-| 1-2 | 6 | Few existing, may have gaps |
-| 3-5 | 4 | Crowded but possibly differentiated |
-| 6+ | 2 | Crowded, hard to differentiate |
+**C/C++:** Skip test directories, main.c/cpp. Detect `#include "..."` as internal.
 
-### Ship effort (heuristic by LOC)
+## Ship effort
 
 | LOC | Hours |
 |---|---|
@@ -90,39 +70,3 @@ Based on GitHub search result count for the same language and ≥5 stars:
 | 50-149 | 3 |
 | 150-299 | 6 |
 | 300-499 | 16 |
-
-These estimates assume the candidate is a self-contained module. If refactoring is needed to remove project coupling, multiply by 2-3x.
-
-### Combined
-
-```
-ship_score = max(0, 10 - ship_effort_hours)
-combined = 0.4 * open_sourceability + 0.4 * uniqueness + 0.2 * ship_score
-```
-
-Maximum 10.
-
-## Suggesting names
-
-Default rule: take the file stem, lowercase, replace non-alphanumeric with `-`, collapse multiple dashes.
-
-Examples:
-- `rate_limited.py` → `rate-limited`
-- `JwtHelper.ts` → `jwt-helper`
-- `string_utils.go` → `string-utils`
-
-Skip if name conflicts with a well-known package (heuristic: contains "request", "express", "react", "django", "flask", "spring"). In that case, prefix with project context.
-
-## LLM-assisted detection (v2)
-
-Pure heuristics miss:
-- Multi-file extractables (e.g., a class split across 3 files)
-- Internal libraries that aren't named like utilities (e.g., `parser/`, `validator/`)
-- Modules that *look* coupled but could be decoupled with light refactoring
-
-For v2, after heuristic detection, optionally:
-1. Pass the repo structure to a local LLM (Ornith-9B)
-2. Ask: "Given this repo, list 5-10 extractable components that pure heuristics would miss"
-3. Merge with heuristic results, deduplicate, re-score
-
-This is opt-in. The CLI defaults to heuristics-only for reproducibility and speed.

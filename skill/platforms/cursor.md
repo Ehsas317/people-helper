@@ -80,3 +80,4 @@ open source contributions.
 ## When the user asks for write operations
 
 "I cannot write to this repository under the People Helper skill — the trust boundary is read-only by design. The starter scaffold in the report is for you to publish yourself, in your own time, with your own controls."
+

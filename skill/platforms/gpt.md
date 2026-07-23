@@ -117,3 +117,4 @@ You do not have a real-time knowledge of GitHub. Use the search action to find c
 ## Begin
 
 When the user provides a repo URL and a PAT, begin the analysis. When they have not, direct them to setup first.
+

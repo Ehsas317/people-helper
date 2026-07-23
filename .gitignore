@@ -31,3 +31,4 @@ build/
 # Generated skill archive (build with skill/build.sh)
 *.skill
 people-helper.skill
+
