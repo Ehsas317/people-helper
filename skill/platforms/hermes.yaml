@@ -2,7 +2,7 @@
 # Drop this into your Hermes skill definition, or merge into your config.
 
 name: people-helper
-version: 0.1.0
+version: 0.3.0
 description: >-
   Find what is extractable from a private GitHub repo as standalone side
   projects or open source contributions. Read-only by design.

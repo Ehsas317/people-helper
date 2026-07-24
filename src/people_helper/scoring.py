@@ -1,17 +1,22 @@
-'''Stage 6: Scoring with the new formula.
+"""Stage 6: Scoring.
 
 Formula: combined = 0.5 * code_quality + 0.3 * uniqueness + 0.2 * demand_signal
 
 - code_quality: how well-written and self-contained the code is (0-10)
 - uniqueness: how rare similar projects are on GitHub (0-10)
 - demand_signal: how much interest exists for this type of tool (0-10)
-'''
+
+New in v0.3:
+- code_quality now applies a complexity penalty (god functions get dinged).
+- code_quality now applies an orphan boost (fan-in == 0 is a great signal).
+- code_quality now applies a cycle penalty.
+"""
 
 from .config import (
     CODE_QUALITY_WEIGHT,
-    UNIQUENESS_WEIGHT,
     DEMAND_SIGNAL_WEIGHT,
     SHIP_EFFORT_BRACKETS,
+    UNIQUENESS_WEIGHT,
 )
 
 
@@ -19,6 +24,8 @@ def _compute_code_quality(cand) -> float:
     """
     Score how ready the code is for open source.
     Tests, docs, independence, small dep footprint.
+    Penalties: high cyclomatic complexity, import cycles.
+    Boosts: zero fan-in (orphan), low complexity.
     """
     score = 0.0
     if cand.has_tests:
@@ -35,7 +42,29 @@ def _compute_code_quality(cand) -> float:
         score += 1
     if cand.filename_score > 0:
         score += 1
-    return min(score, 10.0)
+
+    # --- New v0.3 signals ---
+    # Orphan boost: zero fan-in means nothing else in the repo depends on it,
+    # so it's safe to lift out without breaking anything. This is the ideal
+    # extraction target. Only applies when we actually computed fan-in.
+    if cand.fan_in == 0:
+        score += 1.0
+
+    # Complexity penalty: god functions are hard to extract cleanly.
+    # cc <= 5 → no penalty. cc 6-10 → -0.5. cc 11-20 → -1.5. cc > 20 → -3.0.
+    if cand.complexity > 20:
+        score -= 3.0
+    elif cand.complexity > 10:
+        score -= 1.5
+    elif cand.complexity > 5:
+        score -= 0.5
+
+    # Cycle penalty: a file in an import SCC requires breaking the cycle
+    # before extraction. Strong signal that it's not actually self-contained.
+    if cand.in_cycle:
+        score -= 1.5
+
+    return max(0.0, min(score, 10.0))
 
 
 def _compute_uniqueness(similar_count: int) -> float:
@@ -77,7 +106,21 @@ def _compute_demand_signal(cand) -> float:
         # Open issues signal (indicates user engagement)
         issue_signal = min(3.0, proj.open_issues / 10.0) if proj.open_issues > 0 else 0.0
 
-        total_signal += weight * (star_signal + fork_signal + issue_signal)
+        # New v0.3: stars-per-fork ratio (engagement quality).
+        # High stars but low forks = vanity / curiosity, not real use.
+        # Low stars but high forks = real fork-and-extend usage.
+        if proj.stars > 0 and proj.forks > 0:
+            ratio = proj.stars / proj.forks
+            if ratio > 50:  # lots of stargazers, few forks → hype
+                ratio_signal = 0.0
+            elif ratio < 5:  # lots of forks relative to stars → real usage
+                ratio_signal = 1.5
+            else:
+                ratio_signal = 0.5
+        else:
+            ratio_signal = 0.0
+
+        total_signal += weight * (star_signal + fork_signal + issue_signal + ratio_signal)
         weight_sum += weight
 
     avg_signal = total_signal / weight_sum if weight_sum > 0 else 0
@@ -95,7 +138,7 @@ def _compute_ship_effort(loc: int) -> float:
 
 def score_candidate(cand, similar_count: int) -> None:
     """
-    Score a candidate in-place using the new formula:
+    Score a candidate in-place using the formula:
     combined = 0.5 * code_quality + 0.3 * uniqueness + 0.2 * demand_signal
     """
     cand.code_quality = _compute_code_quality(cand)

@@ -1,12 +1,11 @@
 """Stage 2: Repository cloning and file walking."""
 
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-from .config import SKIP_DIRS, SKIP_EXTS, LANG_BY_EXT
+from .config import LANG_BY_EXT, SKIP_DIRS, SKIP_EXTS
 
 
 def parse_repo_arg(repo_arg: str) -> tuple:
@@ -27,12 +26,14 @@ def parse_repo_arg(repo_arg: str) -> tuple:
     # HTTPS format
     if cleaned.startswith("http"):
         parsed = urlparse(cleaned)
-        parts = parsed.path.strip("/").split("/")
+        path = parsed.path.strip("/").removesuffix(".git")
+        parts = path.split("/")
         if len(parts) < 2:
             raise ValueError(f"Could not parse repo from URL: {repo_arg}")
         return parts[0], parts[1]
 
-    # owner/name format
+    # owner/name format (strip optional .git suffix)
+    cleaned = cleaned.removesuffix(".git")
     parts = cleaned.split("/")
     if len(parts) != 2:
         raise ValueError(f"Expected owner/name, got: {repo_arg}")

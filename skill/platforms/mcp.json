@@ -1,7 +1,6 @@
 {
-  "$schema": "https://openapi.guardsquare.com/mcp-schema.json",
   "name": "people-helper",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "Read-only GitHub analysis. Find what is extractable from a private repo as side projects or open source contributions.",
   "author": "Ehsas317",
   "license": "MIT",

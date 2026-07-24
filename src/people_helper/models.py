@@ -1,7 +1,6 @@
 """Data structures for People Helper."""
 
-from dataclasses import dataclass, field, asdict
-from typing import Optional
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
@@ -29,6 +28,10 @@ class Candidate:
     suggested_name: str = ""
     suggested_license: str = "MIT"
     suggested_tags: list = field(default_factory=list)
+    # New in v0.3: deeper signals
+    complexity: int = 0           # McCabe cyclomatic complexity (Python only, 0 = unknown)
+    fan_in: int = -1              # Number of files that import this one (-1 = unknown)
+    in_cycle: bool = False        # True if this file is in a non-trivial import SCC
     skipped: bool = False
     skip_reason: str = ""
 

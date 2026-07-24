@@ -2,7 +2,7 @@
 # This file describes the skill package for tooling that consumes it.
 
 name: people-helper
-version: 0.2.0
+version: 0.3.0
 description: >-
   Find what is extractable from your private code as standalone side projects
   or open source contributions. Reads a GitHub repository (fine-grained PAT,

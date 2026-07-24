@@ -51,11 +51,25 @@ def suggest_name(cand) -> str:
 def suggest_tags(cand) -> list:
     """
     Suggest GitHub topic tags based on the candidate's traits.
+
+    Tag priority order:
+      1. Language tag (always first)
+      2. Type tags from filename (utility, validation, parser, etc.)
+      3. Generic tags (library, open-source)
+      4. Docstring words (capped to fill the 8-tag limit)
     """
-    tags = set()
+    # Priority-ordered collection: language tag, then type tags, then generic
+    ordered_tags: list = []
+    seen: set = set()
+
+    def _add(tag: str):
+        if tag not in seen:
+            ordered_tags.append(tag)
+            seen.add(tag)
+
     stem = Path(cand.path).stem.lower()
 
-    # Language tag
+    # 1. Language tag (always first)
     lang_tags = {
         "Python": "python",
         "TypeScript": "typescript",
@@ -72,35 +86,35 @@ def suggest_tags(cand) -> list:
         "Swift": "swift",
     }
     if cand.language in lang_tags:
-        tags.add(lang_tags[cand.language])
+        _add(lang_tags[cand.language])
 
-    # Type tags from filename patterns
+    # 2. Type tags from filename patterns
     if any(p in stem for p in ["util", "helper", "common"]):
-        tags.add("utility")
+        _add("utility")
     if any(p in stem for p in ["valid", "guard", "check"]):
-        tags.add("validation")
+        _add("validation")
     if any(p in stem for p in ["parse", "format", "convert", "transform"]):
-        tags.add("parser")
+        _add("parser")
     if any(p in stem for p in ["serializ", "deserializ"]):
-        tags.add("serialization")
+        _add("serialization")
     if any(p in stem for p in ["auth", "jwt", "token", "oauth"]):
-        tags.add("authentication")
+        _add("authentication")
     if any(p in stem for p in ["rate", "limit", "throttl"]):
-        tags.add("rate-limiting")
+        _add("rate-limiting")
     if any(p in stem for p in ["log", "logger"]):
-        tags.add("logging")
+        _add("logging")
     if any(p in stem for p in ["cache", "memoiz"]):
-        tags.add("caching")
+        _add("caching")
     if any(p in stem for p in ["retry", "backoff"]):
-        tags.add("resilience")
+        _add("resilience")
     if any(p in stem for p in ["sanitiz", "escape", "xss"]):
-        tags.add("security")
+        _add("security")
 
-    # Generic tags
-    tags.add("library")
-    tags.add("open-source")
+    # 3. Generic tags
+    _add("library")
+    _add("open-source")
 
-    # Extract from docstring (with noise filtering)
+    # 4. Extract from docstring (with noise filtering) to fill the rest
     _tag_noise = {
         "the", "this", "that", "module", "class", "function",
         "and", "for", "with", "from", "file", "import", "export",
@@ -110,13 +124,15 @@ def suggest_tags(cand) -> list:
         "type", "args", "kwargs", "data", "value", "values",
         "also", "can", "has", "not", "are", "was", "were",
         "will", "should", "could", "would", "does", "than",
+        "small", "string", "strings",  # too generic
     }
     if cand.docstring_snippet:
         for word in cand.docstring_snippet.lower().split():
             w = word.strip(".,;:!?()[]{}'")
-            if 3 < len(w) < 20 and w.isalpha() and w not in _tag_noise:
-                tags.add(w)
+            if 3 < len(w) < 20 and w.isalpha() and w not in _tag_noise and w not in seen:
+                _add(w)
+            if len(ordered_tags) >= 8:
+                break
 
-    # Cap at 8 tags, prioritize specific ones
-    result = list(tags)[:8]
-    return result
+    # Cap at 8 tags
+    return ordered_tags[:8]

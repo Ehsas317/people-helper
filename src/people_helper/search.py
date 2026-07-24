@@ -2,7 +2,7 @@
 
 import re
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import httpx
@@ -10,7 +10,8 @@ import httpx
 from .config import GITHUB_API
 from .models import SimilarProject
 
-
+# Repos pushed within the last 24 months count as "active".
+# Computed at module load — fine for a CLI run.
 TWENTY_FOUR_MONTHS_AGO = (datetime.now(timezone.utc) - timedelta(days=730)).strftime("%Y-%m-%d")
 
 
@@ -100,6 +101,9 @@ def compute_differentiators(candidate) -> list:
     """
     Generate differentiators by comparing the candidate's traits
     against its similar projects.
+
+    New in v0.3: looks at ALL similar projects, not just the top one,
+    to compute median maintenance health + niche gaps.
     """
     if not candidate.similar_projects:
         return ["No similar projects found with 5+ stars and recent activity — potential first-mover opportunity"]
@@ -107,7 +111,7 @@ def compute_differentiators(candidate) -> list:
     differentiators = []
     top = candidate.similar_projects[0]
 
-    # Compare stars/activity
+    # Compare stars/activity of the TOP result
     if top.stars > 1000:
         differentiators.append(
             f"The top result ({top.full_name}) has {top.stars:,} stars — your implementation would need a clear advantage in approach or niche to compete"
@@ -151,6 +155,36 @@ def compute_differentiators(candidate) -> list:
         differentiators.append(
             f"Your candidate has tests while {top.full_name} has {top.open_issues} open issues — reliability could be a differentiator"
         )
+
+    # --- New v0.3: aggregate stats across ALL similar projects ---
+    all_projs = candidate.similar_projects
+
+    # Niche gap: how many of the similar projects are stale (>12 months)?
+    stale_count = 0
+    for p in all_projs:
+        if p.pushed_at:
+            try:
+                pdate = datetime.strptime(p.pushed_at, "%Y-%m-%d")
+                if (datetime.now() - pdate).days > 365:
+                    stale_count += 1
+            except ValueError:
+                pass
+    if len(all_projs) >= 3 and stale_count >= len(all_projs) * 0.6:
+        differentiators.append(
+            f"{stale_count}/{len(all_projs)} similar projects haven't been pushed in over a year — clear opening for an actively-maintained alternative"
+        )
+
+    # Stars-per-fork engagement quality (top result only — others may be noisy)
+    if top.stars > 100 and top.forks > 0:
+        ratio = top.stars / top.forks
+        if ratio > 50:
+            differentiators.append(
+                f"{top.full_name} has {top.stars:,} stars but only {top.forks} forks (ratio {ratio:.0f}:1) — high curiosity, low real usage. Your implementation can win on actual usability."
+            )
+        elif ratio < 5:
+            differentiators.append(
+                f"{top.full_name} has {top.forks} forks vs {top.stars:,} stars (ratio {ratio:.1f}:1) — high real-usage signal; the market is proven but you'd be entering a competitive fork-and-extend space"
+            )
 
     if not differentiators:
         differentiators.append(

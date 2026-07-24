@@ -1,7 +1,7 @@
 ---
 name: people-helper
 description: "Find what is extractable from your private code as standalone side projects or open source contributions. Reads a GitHub repository (fine-grained PAT, read-only), identifies candidate components, searches GitHub for similar projects, and produces a structured report with differentiators, suggested names, and starter scaffolds."
-version: 0.2.0
+version: 0.3.0
 author: Ehsas317
 license: MIT
 homepage: https://github.com/Ehsas317/people-helper
