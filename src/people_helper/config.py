@@ -1,0 +1,116 @@
+"""Constants and configuration for People Helper."""
+
+GITHUB_API = "https://api.github.com"
+
+LANG_BY_EXT = {
+    ".py": "Python", ".ts": "TypeScript", ".tsx": "TypeScript",
+    ".js": "JavaScript", ".jsx": "JavaScript", ".go": "Go",
+    ".rs": "Rust", ".java": "Java", ".kt": "Kotlin",
+    ".c": "C", ".h": "C", ".cpp": "C++", ".hpp": "C++",
+    ".cs": "C#", ".rb": "Ruby", ".php": "PHP", ".swift": "Swift",
+}
+
+SKIP_DIRS = {
+    ".git", "node_modules", "__pycache__", "vendor", "dist", "build",
+    ".next", "target", ".venv", "venv", "env", ".env", ".tox",
+    ".mypy_cache", ".pytest_cache", "upload", "extracted", "vendored",
+    "third_party", "third-party", "deps", "_vendor", "bower_components",
+    "jspm_packages",
+}
+
+SKIP_EXTS = {
+    ".lock", ".log", ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg",
+    ".woff", ".woff2", ".ttf", ".eot", ".mp4", ".mp3", ".zip", ".tar",
+    ".gz", ".pdf", ".bin", ".pyc", ".pyo", ".class", ".o", ".so", ".dll",
+}
+
+UTILITY_PATTERNS = [
+    "util", "helper", "common", "lib", "tool", "format", "parse",
+    "convert", "validate", "sanitize", "protection", "guard", "filter",
+    "normaliz", "middleware", "interceptor", "serializer", "transformer",
+    "adapter", "resolver", "builder",
+]
+
+FRAMEWORK_ENTRY_NAMES = {
+    "route", "page", "layout", "loading", "error", "not-found",
+    "middleware", "index", "main", "app", "server", "_app", "_document",
+    "head", "template", "setup",
+}
+
+FRAMEWORK_SPECIAL_FILES = {
+    "route.ts", "route.tsx", "route.js", "route.jsx",
+    "page.tsx", "page.jsx", "page.ts", "page.js",
+    "layout.tsx", "layout.ts", "layout.jsx", "layout.js",
+    "loading.tsx", "loading.ts", "loading.jsx", "loading.js",
+    "error.tsx", "error.ts", "error.jsx", "error.js",
+    "not-found.tsx", "not-found.ts", "middleware.ts", "middleware.js",
+    "_app.tsx", "_app.jsx", "_document.tsx", "_document.jsx",
+    "+page.svelte", "+layout.svelte", "+server.ts",
+}
+
+FRAMEWORK_DIRS = {"app", "pages", "routes"}
+EXTERNAL_SCOPES = {"types", "angular", "vue", "react", "nestjs", "prisma", "next", "svelte", "nuxt", "astro"}
+
+# Scoring weights (6 dimensions, sum to 1.0)
+CODE_QUALITY_WEIGHT = 0.25
+UNIQUENESS_WEIGHT = 0.15
+DEMAND_SIGNAL_WEIGHT = 0.10
+RELEVANCE_WEIGHT = 0.15
+USEFULNESS_WEIGHT = 0.20
+MAINTAINABILITY_WEIGHT = 0.15
+
+SHIP_EFFORT_BRACKETS = [(50, 1.5), (150, 3.0), (300, 6.0), (500, 16.0)]
+
+# Dependency classification
+PYTHON_STDLIB = {
+    "re", "os", "sys", "json", "typing", "pathlib", "datetime", "collections",
+    "functools", "itertools", "math", "random", "string", "textwrap",
+    "unicodedata", "io", "csv", "hashlib", "hmac", "secrets", "base64",
+    "binascii", "struct", "codecs", "pprint", "copy", "enum", "dataclasses",
+    "abc", "contextlib", "inspect", "traceback", "warnings", "logging",
+    "argparse", "configparser", "shutil", "tempfile", "glob", "fnmatch",
+    "subprocess", "threading", "multiprocessing", "queue", "socket", "ssl",
+    "http", "urllib", "email", "html", "xml", "sqlite3", "zlib", "gzip",
+    "bz2", "lzma", "tarfile", "zipfile", "time", "calendar", "platform",
+    "signal", "atexit", "weakref", "gc", "types", "numbers", "decimal",
+    "fractions", "statistics", "array", "bisect", "heapq", "operator",
+    "difflib", "uuid", "ipaddress", "unittest", "doctest", "ast", "dis",
+    "importlib", "ctypes", "asyncio", "selectors", "errno", "__future__",
+}
+
+PYTHON_HEAVY = {
+    "tensorflow", "tf", "torch", "numpy", "pandas", "scipy", "sklearn",
+    "matplotlib", "seaborn", "django", "flask", "fastapi", "starlette",
+    "sqlalchemy", "psycopg2", "pymongo", "redis", "celery", "ansible",
+    "boto3", "kubernetes", "twisted", "tornado", "aiohttp", "cv2",
+    "PIL", "pillow", "transformers", "datasets", "spark", "pyspark",
+    "ray", "dask", "xgboost", "keras", "jax", "libtwml",
+}
+
+JS_HEAVY = {
+    "react", "vue", "angular", "svelte", "next", "nuxt", "express",
+    "fastify", "koa", "webpack", "vite", "three", "d3", "tensorflow",
+    "playwright", "puppeteer", "jest", "babel", "mongoose", "sequelize",
+    "prisma", "electron", "rxjs", "redux",
+}
+
+RUST_STDLIB = {"std", "core", "alloc", "proc_macro"}
+RUST_LIGHT = {"serde", "serde_json", "anyhow", "thiserror", "tokio", "clap", "rand", "chrono", "uuid", "regex", "log"}
+
+GO_STDLIB = {
+    "fmt", "os", "io", "net", "http", "encoding", "strings", "strconv",
+    "sort", "time", "math", "errors", "context", "sync", "runtime",
+    "path", "filepath", "flag", "log", "regexp", "bytes", "bufio",
+    "crypto", "hash", "reflect", "testing", "database", "sql",
+}
+
+GO_HEAVY = {"k8s.io", "kubernetes", "helm", "gin", "echo", "grpc", "protobuf", "docker"}
+
+PROJECT_SPECIFIC_PATTERNS = [
+    r"tf\.logging\.", r"tf\.app\.flags", r"tf\.compat\.v1",
+    r"libtwml", r"CLIB\.", r"twml\.",
+    r"AnsibleModule", r"ansible\.utils",
+    r"django\.conf", r"django\.db\.models", r"models\.Model",
+    r"flask\.current_app", r"current_app\.", r"_app_ctx",
+    r"getServerSideProps", r"getStaticProps", r"next/router",
+]
