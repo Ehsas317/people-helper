@@ -1,5 +1,7 @@
 """Ruby language handler."""
+
 import re
+
 from .base import LanguageHandler
 
 
@@ -28,9 +30,11 @@ class RubyHandler(LanguageHandler):
         count, names = 0, []
         # Ruby: def method_name (public by default), class Foo, module Bar
         for m in re.finditer(r"^\s*def\s+(?:self\.)?(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         for m in re.finditer(r"^\s*(?:module|class)\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -56,7 +60,7 @@ class RubyHandler(LanguageHandler):
         for i, line in enumerate(lines[:100]):
             if line.strip() == "=begin":
                 block = [line]
-                for ln in lines[i + 1:i + 30]:
+                for ln in lines[i + 1 : i + 30]:
                     block.append(ln)
                     if ln.strip() == "=end":
                         break
@@ -66,11 +70,6 @@ class RubyHandler(LanguageHandler):
     def is_internal_import(self, line: str, _project_modules: set) -> bool:
         return bool(re.match(r"^\s*require_relative\s+", line))
 
-    def _is_external_import_line(self, line: str) -> bool:
-        if re.match(r"^\s*require\s+", line) and not re.match(r"^\s*require_relative\s+", line):
-            return True
-        return False
-
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
             return (0, True)
@@ -79,14 +78,14 @@ class RubyHandler(LanguageHandler):
     def get_complexity(self, content: str) -> int:
         """Regex-based cyclomatic complexity for Ruby."""
         cc = 1
-        cc += len(re.findall(r'\bif\b', content))
-        cc += len(re.findall(r'\belsif\b', content))
-        cc += len(re.findall(r'\bfor\b', content))
-        cc += len(re.findall(r'\bwhile\b', content))
-        cc += len(re.findall(r'\bunless\b', content))
-        cc += len(re.findall(r'\bcase\b', content))
-        cc += len(re.findall(r'\bwhen\b', content))
-        cc += len(re.findall(r'\brescue\b', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
+        cc += len(re.findall(r"\bif\b", content))
+        cc += len(re.findall(r"\belsif\b", content))
+        cc += len(re.findall(r"\bfor\b", content))
+        cc += len(re.findall(r"\bwhile\b", content))
+        cc += len(re.findall(r"\bunless\b", content))
+        cc += len(re.findall(r"\bcase\b", content))
+        cc += len(re.findall(r"\bwhen\b", content))
+        cc += len(re.findall(r"\brescue\b", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
         return cc

@@ -174,7 +174,7 @@ Framework-tied code (e.g. `tf.logging`, `ansible_module`, `django.conf`) is dete
 
 ### Universal
 
-- 10-500 LOC (non-empty, non-comment lines)
+- At least 10 LOC (non-empty, non-comment lines). No hard upper limit — large files get a graduated maintainability penalty (-0.1 per 150 LOC over 500) instead of being skipped.
 - Not a test file
 - Not a framework route file (Next.js pages, SvelteKit routes, etc.)
 - Not a CLI entry point

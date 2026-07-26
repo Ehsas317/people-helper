@@ -1,7 +1,9 @@
 """Go language handler."""
+
 import re
+
+from ..config import GO_HEAVY, GO_STDLIB
 from .base import LanguageHandler
-from ..config import GO_STDLIB, GO_HEAVY
 
 
 class GoHandler(LanguageHandler):
@@ -27,9 +29,11 @@ class GoHandler(LanguageHandler):
         count, names = 0, []
         # Go: capitalized = exported (public)
         for m in re.finditer(r"^\s*func\s+([A-Z]\w*)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         for m in re.finditer(r"^\s*type\s+([A-Z]\w*)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -53,7 +57,7 @@ class GoHandler(LanguageHandler):
             return False, ""
         # Collect consecutive // comments IMMEDIATELY BEFORE the package line
         # (allowing blank lines between them)
-        comment_block = []
+        comment_block: list[str] = []
         for j in range(package_line_idx - 1, -1, -1):
             stripped = lines[j].strip()
             if stripped.startswith("//"):
@@ -67,10 +71,12 @@ class GoHandler(LanguageHandler):
         # Filter out license-header-only comments
         # (e.g. "Copyright 2024", "Licensed under MIT")
         if comment_block:
-            joined = "\n".join(comment_block).lower()
             # If ALL comment lines are copyright/license, treat as license header not docstring
-            copyright_lines = sum(1 for l in comment_block
-                                  if "copyright" in l.lower() or "license" in l.lower() or "licensed" in l.lower())
+            copyright_lines: int = sum(
+                1
+                for l in comment_block
+                if "copyright" in l.lower() or "license" in l.lower() or "licensed" in l.lower()
+            )
             if copyright_lines == len(comment_block):
                 return False, ""
             return True, "\n".join(comment_block).strip()
@@ -79,10 +85,6 @@ class GoHandler(LanguageHandler):
     # Go: can't reliably tell internal from external without go.mod module path
     def is_internal_import(self, line: str, _project_modules: set) -> bool:
         return False
-
-    def _is_external_import_line(self, line: str) -> bool:
-        # Only count imports with "/" (stdlib imports like "fmt" have no "/")
-        return bool(re.match(r'^\s*"[\w./\-]+/[\w./\-]+"', line))
 
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
@@ -93,9 +95,11 @@ class GoHandler(LanguageHandler):
             if ml in GO_STDLIB:
                 w = 0
             elif ml in GO_HEAVY or "k8s.io" in ml:
-                w = 3; all_stdlib = False
+                w = 3
+                all_stdlib = False
             else:
-                w = 1; all_stdlib = False
+                w = 1
+                all_stdlib = False
             max_weight = max(max_weight, w)
         return (max_weight, all_stdlib)
 
@@ -105,9 +109,9 @@ class GoHandler(LanguageHandler):
         Counts: if, for, switch case, select case, &&, ||.
         """
         cc = 1
-        cc += len(re.findall(r'\bif\s+', content))
-        cc += len(re.findall(r'\bfor\s+', content))
-        cc += len(re.findall(r'\bcase\s+', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
+        cc += len(re.findall(r"\bif\s+", content))
+        cc += len(re.findall(r"\bfor\s+", content))
+        cc += len(re.findall(r"\bcase\s+", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
         return cc

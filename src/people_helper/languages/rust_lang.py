@@ -1,8 +1,9 @@
 """Rust language handler."""
-import re
-from .base import LanguageHandler
-from ..config import RUST_STDLIB, RUST_LIGHT
 
+import re
+
+from ..config import RUST_LIGHT, RUST_STDLIB
+from .base import LanguageHandler
 
 _REL_IMPORT_RS = re.compile(r"^\s*use\s+(super|crate|self)(?:::([\w.]+))?")
 
@@ -47,9 +48,11 @@ class RustHandler(LanguageHandler):
     def count_public_api(self, content: str) -> tuple:
         count, names = 0, []
         for m in re.finditer(r"^\s*pub\s+(?:async\s+)?fn\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         for m in re.finditer(r"^\s*pub\s+(?:struct|enum|trait)\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -69,11 +72,6 @@ class RustHandler(LanguageHandler):
     def is_internal_import(self, line: str, _project_modules: set) -> bool:
         return bool(re.match(r"^\s*use\s+(crate|super|self)", line))
 
-    def _is_external_import_line(self, line: str) -> bool:
-        if re.match(r"^\s*use\s+", line) and not re.match(r"^\s*use\s+(crate|super|self)", line):
-            return True
-        return False
-
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
             return (0, True)
@@ -83,9 +81,11 @@ class RustHandler(LanguageHandler):
             if ml in RUST_STDLIB or ml.startswith(("std::", "core::", "alloc::")):
                 w = 0
             elif ml in RUST_LIGHT:
-                w = 1; all_stdlib = False
+                w = 1
+                all_stdlib = False
             else:
-                w = 1; all_stdlib = False
+                w = 1
+                all_stdlib = False
             max_weight = max(max_weight, w)
         return (max_weight, all_stdlib)
 
@@ -95,11 +95,11 @@ class RustHandler(LanguageHandler):
         Counts: if, match arm, for, while, loop, &&, ||.
         """
         cc = 1
-        cc += len(re.findall(r'\bif\s+', content))
-        cc += len(re.findall(r'\bmatch\s+', content))
-        cc += len(re.findall(r'\bfor\s+', content))
-        cc += len(re.findall(r'\bwhile\s+', content))
-        cc += len(re.findall(r'\bloop\s*\{', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
+        cc += len(re.findall(r"\bif\s+", content))
+        cc += len(re.findall(r"\bmatch\s+", content))
+        cc += len(re.findall(r"\bfor\s+", content))
+        cc += len(re.findall(r"\bwhile\s+", content))
+        cc += len(re.findall(r"\bloop\s*\{", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
         return cc

@@ -4,9 +4,9 @@
 name: people-helper
 version: 1.0.0
 description: >-
-  Find what is extractable from your private code as standalone side projects
-  or open source contributions. Reads a GitHub repository (fine-grained PAT,
-  read-only), identifies candidate components, searches GitHub for similar
+  Find what is extractable from a GitHub repository as standalone side
+  projects or open source contributions. Reads a GitHub repository (fine-grained
+  PAT, read-only), identifies candidate components, searches GitHub for similar
   projects, and produces a structured report with differentiators, suggested
   names, and starter scaffolds.
 author: Ehsas317
@@ -44,10 +44,30 @@ inputs:
     type: string
     required: true
     description: GitHub repo URL or owner/name
+  - name: output
+    type: string
+    default: report.md
+    description: Output report path
+  - name: extract
+    type: string
+    required: false
+    description: Directory to extract top candidates to (creates package scaffolds)
   - name: max_candidates
     type: integer
     default: 10
-    description: Max extractables to surface
+    description: Max extractables to surface in report
+  - name: max_extract
+    type: integer
+    default: 5
+    description: Max candidates to extract (with --extract)
+  - name: min_score
+    type: number
+    default: 0.0
+    description: Only show candidates with score >= this (0-10)
+  - name: extract_min_score
+    type: number
+    default: 6.0
+    description: Min score for extraction (with --extract)
   - name: min_stars
     type: integer
     default: 5
@@ -55,7 +75,19 @@ inputs:
   - name: language
     type: string
     required: false
-    description: Filter to one language
+    description: Filter to one language (Python, TypeScript, JavaScript, Go, Rust, Java, Kotlin, C, C++, C#, Ruby, PHP, Swift)
+  - name: no_network
+    type: boolean
+    default: false
+    description: Skip GitHub search (local-only mode, no data leaves machine)
+  - name: verbose
+    type: boolean
+    default: false
+    description: Verbose step-by-step progress output
+  - name: debug
+    type: boolean
+    default: false
+    description: Show stack traces on errors (for bug reports)
 
 # Outputs the skill produces
 outputs:
@@ -96,7 +128,7 @@ triggers:
   - "analyze my repo"
   - "find extractables"
   - "what can I open source from my code"
-  - "scan my private repo"
+  - "scan my repo"
   - "people helper"
   - "find side projects in my code"
   - "open source opportunities"

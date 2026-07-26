@@ -67,7 +67,7 @@ You do **not** have actions to:
 ## Heuristics for candidate extractables
 
 **Likely extractable:**
-- Small to medium (10-500 LOC)
+- Small to medium (10+ LOC (large files get graduated penalty))
 - Has docstrings or substantial comments
 - Few or no internal project imports
 - Has tests
@@ -79,7 +79,7 @@ You do **not** have actions to:
 - Hardcoded project config
 - CLI entry points
 - No tests, no docs
-- > 500 LOC and multi-responsibility
+- > 1000 LOC (very large) and multi-responsibility
 
 ## Output format
 

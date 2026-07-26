@@ -3,6 +3,7 @@
 Defines the interface every language module must implement.
 Subclasses override only what they need; defaults are sensible no-ops.
 """
+
 from abc import ABC, abstractmethod
 
 
@@ -68,12 +69,20 @@ class LanguageHandler(ABC):
         external = len(self.extract_external_imports(content))
         return internal, external
 
-    def _is_external_import_line(self, line: str) -> bool:
-        """Override in subclasses to identify external import lines.
+    def get_dependency_weight(self, imports: list) -> tuple:
+        """Return (weight, is_stdlib_only) for a list of external imports.
 
-        Default returns False — subclasses must override if they have imports.
+        Weight scale:
+            0 = stdlib only (truly standalone)
+            1 = light deps (small external footprint)
+            3 = heavy deps (framework-tied, not standalone)
+
+        Default: empty list → (0, True); anything else → (1, False).
+        Subclasses override to implement real stdlib/heavy classification.
         """
-        return False
+        if not imports:
+            return 0, True
+        return 1, False
 
     def count_loc(self, content: str) -> int:
         """Count lines of code (non-blank, non-comment).
@@ -89,8 +98,17 @@ class LanguageHandler(ABC):
         """
         # C-family languages where ' * ' is a block-comment continuation
         # Python and Ruby use '*' for unpacking (*args, *head) — must not strip
-        is_c_family = self.language_name in {"C", "C++", "Java", "Kotlin", "C#",
-                                              "JavaScript", "TypeScript", "PHP", "Swift"}
+        is_c_family = self.language_name in {
+            "C",
+            "C++",
+            "Java",
+            "Kotlin",
+            "C#",
+            "JavaScript",
+            "TypeScript",
+            "PHP",
+            "Swift",
+        }
 
         count = 0
         in_block_comment = False

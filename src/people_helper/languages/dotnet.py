@@ -3,7 +3,9 @@
 Fixes round-4 bug: /// XML documentation comments (Microsoft's dominant
 convention) were not detected. Now we detect /// in addition to /** */.
 """
+
 import re
+
 from .base import LanguageHandler
 
 
@@ -30,12 +32,22 @@ class DotNetHandler(LanguageHandler):
 
     def count_public_api(self, content: str) -> tuple:
         count, names = 0, []
-        for m in re.finditer(r"^\s*public\s+(?:sealed\s+|abstract\s+|static\s+|virtual\s+|override\s+|async\s+)*(?:class|interface|struct|enum)\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
-        for m in re.finditer(r"^\s*public\s+(?:sealed\s+|abstract\s+|static\s+|virtual\s+|override\s+|async\s+)*(?:[\w<>\[\],?\s]+)\s+(\w+)\s*\(", content, re.MULTILINE):
+        for m in re.finditer(
+            r"^\s*public\s+(?:sealed\s+|abstract\s+|static\s+|virtual\s+|override\s+|async\s+)*(?:class|interface|struct|enum)\s+(\w+)",
+            content,
+            re.MULTILINE,
+        ):
+            count += 1
+            names.append(m.group(1))
+        for m in re.finditer(
+            r"^\s*public\s+(?:sealed\s+|abstract\s+|static\s+|virtual\s+|override\s+|async\s+)*(?:[\w<>\[\],?\s]+)\s+(\w+)\s*\(",
+            content,
+            re.MULTILINE,
+        ):
             name = m.group(1)
             if name not in {"class", "interface", "struct", "enum"}:
-                count += 1; names.append(name)
+                count += 1
+                names.append(name)
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -63,7 +75,7 @@ class DotNetHandler(LanguageHandler):
         # Check for /** */ block comment
         if start < len(lines) and lines[start].strip().startswith(("/**", "/*")):
             snippet_lines = []
-            for line in lines[start:start + 30]:
+            for line in lines[start : start + 30]:
                 snippet_lines.append(line)
                 if line.strip().endswith("*/"):
                     break
@@ -83,9 +95,6 @@ class DotNetHandler(LanguageHandler):
     def is_internal_import(self, line: str, _project_modules: set) -> bool:
         return False
 
-    def _is_external_import_line(self, line: str) -> bool:
-        return bool(re.match(r"^\s*using\s+[\w.]+\s*;", line))
-
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
             return (0, True)
@@ -94,12 +103,12 @@ class DotNetHandler(LanguageHandler):
     def get_complexity(self, content: str) -> int:
         """Regex-based cyclomatic complexity for C#."""
         cc = 1
-        cc += len(re.findall(r'\bif\s*\(', content))
-        cc += len(re.findall(r'\bfor\s*\(', content))
-        cc += len(re.findall(r'\bwhile\s*\(', content))
-        cc += len(re.findall(r'\bcase\s+', content))
-        cc += len(re.findall(r'\bcatch\s*\(', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
-        cc += len(re.findall(r'\?\s*[^?]', content))
+        cc += len(re.findall(r"\bif\s*\(", content))
+        cc += len(re.findall(r"\bfor\s*\(", content))
+        cc += len(re.findall(r"\bwhile\s*\(", content))
+        cc += len(re.findall(r"\bcase\s+", content))
+        cc += len(re.findall(r"\bcatch\s*\(", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
+        cc += len(re.findall(r"\?\s*[^?]", content))
         return cc

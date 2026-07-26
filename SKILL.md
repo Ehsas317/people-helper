@@ -55,7 +55,31 @@ scaffolds.
 1. **Create a fine-grained GitHub PAT** with only `Contents: Read` and
    `Metadata: Read` permissions. Do NOT add write scopes.
 2. Export it: `export PEOPLE_HELPER_PAT=ghp_...`
-3. Install dependencies: `pip install -r requirements.txt`
+3. Install: `pip install -e .` (or `pipx install people-helper` from PyPI)
+4. Optional: `export PEOPLE_HELPER_AUTHOR_NAME="Your Name"` and
+   `PEOPLE_HELPER_AUTHOR_EMAIL="you@example.com"` for extracted packages.
+
+## CLI Flags
+
+```
+people-helper --repo owner/name [options]
+
+  --repo REPO          GitHub repo URL or owner/name (required)
+  --output PATH        Output report path (default: report.md)
+  --extract DIR        Extract top candidates to DIR (creates package scaffolds)
+  --max-candidates N   Max candidates in report (default: 10)
+  --max-extract N      Max candidates to extract (default: 5)
+  --min-score N        Only show candidates with score >= this (default: 0.0)
+  --extract-min-score  Min score for extraction (default: 6.0)
+  --min-stars N        Min stars for similar projects search (default: 5)
+  --language LANG      Filter to one language (choices: Python, TypeScript, etc.)
+  --no-network         Skip GitHub search (local-only mode)
+  --verbose            Verbose step-by-step progress output
+  --debug              Show stack traces on errors (for bug reports)
+  --version            Print version and exit
+```
+
+Exit codes: 0=success, 1=error, 2=argparse, 3=auth, 4=bad input, 5=repo error, 130=interrupted.
 
 ## Trust Boundary (Read-Only)
 
@@ -73,12 +97,14 @@ combined = 0.25×quality + 0.20×usefulness + 0.15×uniqueness
 
 | Dimension | Weight | How it's measured |
 |-----------|--------|-------------------|
-| Code quality | 25% | Tests (+2.5), docs (+1.5), no internal imports (+1.5), few external deps (+1.5), verified standalone (+1.0), utility filename (+0.5), fan-in=0 (+0.5); penalties: high complexity (-3 to -0.5), cycle (-2.0), no-tests-no-docs (-1.5); excellent bonus (+1.0) |
+| Code quality | 25% | Tests (+2.5), docs (+1.5), no internal imports (+1.5), few external deps (+1.5), verified standalone (+1.0), utility filename (+0.5), fan-in=0 (+0.5); penalties: high complexity (-3 to -0.5), cycle (-2.0), no-tests-no-docs (-1.5), >400 LOC (-0.5); excellent bonus (+1.0) |
 | Usefulness | 20% | Generic function names (+1.5), generic filename (+1.0), 50-300 LOC (+1.0), API ≥3 (+1.0), stdlib-only (+0.5); penalties: no API (-1.0), snippet-only (-0.5) |
-| Uniqueness | 15% | GitHub search: 0 → 8, 1-2 → 6, 3-5 → 4, 6+ → 2. --no-network: neutral 5.0 |
+| Uniqueness | 15% | GitHub search: 0 → 8, 1-2 → 6, 3-5 → 4, 6+ → 2. --no-network or rate-limited: neutral 5.0 |
 | Relevance | 15% | Verified single-file (+2.5), multi-file (-1.5), stdlib-only (+2.0), API ≥3 (+1.5), no license (-1.0), project-specific refs (-2.0) |
-| Maintainability | 15% | Comment ratio ≥15% (+2.0), docstring (+1.0), low complexity (+1.5), 50-200 LOC (+1.0), tests (+0.5) |
+| Maintainability | 15% | Comment ratio ≥15% (+2.0), docstring (+1.0), low complexity (+1.5), 50-200 LOC (+1.0), tests (+0.5); penalties: >400 LOC (-0.5), **>500 LOC graduated penalty: -0.1 per 150 LOC over 500** |
 | Demand signal | 10% | Stars, forks, issues of similar projects (capped linear, rank-weighted) |
+
+**LOC scoring note:** There is **no hard LOC ceiling** — files >500 LOC are detected but get a graduated maintainability penalty (-0.1 per 150 LOC over 500). Minimum: 10 LOC (below that = snippet, skipped).
 
 **Hard gate:** If `relevance < 3.0`, combined is halved — a file that isn't genuinely standalone can't be saved by good code quality alone.
 

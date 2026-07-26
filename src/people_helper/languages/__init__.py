@@ -11,18 +11,18 @@ Each language family module exposes a `LanguageHandler` with these methods:
 Each language lives in its own module so adding a language or fixing a
 language-specific behavior touches exactly one file.
 """
+
 from .base import LanguageHandler
-from .python_lang import PythonHandler
-from .js_ts import JsTsHandler
-from .go_lang import GoHandler
-from .rust_lang import RustHandler
-from .jvm import JvmHandler
 from .c_family import CFamilyHandler
 from .dotnet import DotNetHandler
-from .ruby_lang import RubyHandler
+from .go_lang import GoHandler
+from .js_ts import JsTsHandler
+from .jvm import JvmHandler
 from .php_lang import PhpHandler
+from .python_lang import PythonHandler
+from .ruby_lang import RubyHandler
+from .rust_lang import RustHandler
 from .swift_lang import SwiftHandler
-
 
 # Registry: extension → handler instance
 _HANDLERS = {

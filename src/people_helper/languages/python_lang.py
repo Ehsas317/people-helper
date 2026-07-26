@@ -1,9 +1,10 @@
 """Python language handler."""
+
 import ast
 import re
-from .base import LanguageHandler
-from ..config import PYTHON_STDLIB, PYTHON_HEAVY
 
+from ..config import PYTHON_HEAVY, PYTHON_STDLIB
+from .base import LanguageHandler
 
 _REL_IMPORT_PY = re.compile(r"^\s*from\s+(\.+)([\w.]*)\s+import\s+(.+)$")
 
@@ -115,6 +116,9 @@ class PythonHandler(LanguageHandler):
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
+        # Strip BOM if present (Windows-created files often have one)
+        if content.startswith("\ufeff"):
+            content = content[1:]
         lines = content.splitlines()
         if not lines:
             return False, ""
@@ -146,7 +150,7 @@ class PythonHandler(LanguageHandler):
                 snippet_lines = [lines[start].lstrip()]
                 if first_line.count(end_quote) >= 2:
                     return True, "\n".join(snippet_lines).strip()
-                for line in lines[start + 1:start + 21]:
+                for line in lines[start + 1 : start + 21]:
                     snippet_lines.append(line)
                     if end_quote in line:
                         break
@@ -163,9 +167,6 @@ class PythonHandler(LanguageHandler):
         if m:
             return m.group(1).split(".")[0] in project_modules
         return False
-
-    def _is_external_import_line(self, line: str) -> bool:
-        return bool(re.match(r"^\s*(import|from)\s+", line))
 
     def get_complexity(self, content: str) -> int:
         try:
@@ -195,8 +196,10 @@ class PythonHandler(LanguageHandler):
             if ml in PYTHON_STDLIB or ml == "__future__":
                 w = 0
             elif ml in PYTHON_HEAVY:
-                w = 3; all_stdlib = False
+                w = 3
+                all_stdlib = False
             else:
-                w = 1; all_stdlib = False
+                w = 1
+                all_stdlib = False
             max_weight = max(max_weight, w)
         return (max_weight, all_stdlib)

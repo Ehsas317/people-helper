@@ -1,6 +1,6 @@
 """Data structures for People Helper."""
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -30,7 +30,9 @@ class Candidate:
     similar_projects: list = field(default_factory=list)
     differentiators: list = field(default_factory=list)
     suggested_name: str = ""
-    suggested_license: str = "MIT"
+    # Default is REVIEW-NEEDED — user must explicitly choose a license.
+    # Auto-assigning MIT would be a compliance bug for GPL/AGPL sources.
+    suggested_license: str = "REVIEW-NEEDED"
     suggested_tags: list = field(default_factory=list)
     # Deep signals (computed from FULL content during detection)
     complexity: int = 0
@@ -50,6 +52,8 @@ class Candidate:
     source_has_license: bool = True  # whether the source repo has a license file
     skipped: bool = False
     skip_reason: str = ""
+    # External check results (for future --check feature; populated by checks.py)
+    check_results: list = field(default_factory=list)
 
 
 @dataclass

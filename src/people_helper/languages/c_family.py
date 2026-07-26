@@ -3,29 +3,111 @@
 Fixes round-4 bug: angle-bracket includes for boost/opencv/eigen were
 treated as stdlib. Now we maintain explicit stdlib header sets.
 """
+
 import re
+
 from .base import LanguageHandler
 
-
 # Known C standard library headers (skip these — they're stdlib)
-_C_STDLIB = {"stdio", "stdlib", "string", "math", "ctype", "errno", "assert",
-             "time", "signal", "setjmp", "locale", "stdarg", "stddef", "limits",
-             "float", "iso646", "wchar", "wctype", "complex", "tgmath", "fenv",
-             "inttypes", "stdint", "stdbool", "unistd", "pthread", "dlfcn",
-             "sys", "netdb", "netinet", "arpa", "fcntl", "syslog"}
+_C_STDLIB = {
+    "stdio",
+    "stdlib",
+    "string",
+    "math",
+    "ctype",
+    "errno",
+    "assert",
+    "time",
+    "signal",
+    "setjmp",
+    "locale",
+    "stdarg",
+    "stddef",
+    "limits",
+    "float",
+    "iso646",
+    "wchar",
+    "wctype",
+    "complex",
+    "tgmath",
+    "fenv",
+    "inttypes",
+    "stdint",
+    "stdbool",
+    "unistd",
+    "pthread",
+    "dlfcn",
+    "sys",
+    "netdb",
+    "netinet",
+    "arpa",
+    "fcntl",
+    "syslog",
+}
 
 # Known C++ standard library headers (skip these — they're stdlib)
-_CPP_STDLIB = {"iostream", "fstream", "sstream", "iomanip", "vector", "list",
-               "deque", "queue", "stack", "map", "unordered_map", "set",
-               "unordered_set", "algorithm", "numeric", "functional", "memory",
-               "utility", "tuple", "string", "array", "iterator", "exception",
-               "stdexcept", "typeinfo", "type_traits", "chrono", "ratio",
-               "atomic", "thread", "mutex", "condition_variable", "future",
-               "regex", "random", "locale", "codecvt", "filesystem", "optional",
-               "variant", "any", "bitset", "valarray", "complex", "new",
-               "cassert", "cstdio", "cstdlib", "cstring", "cmath", "cerrno",
-               "ctime", "cctype", "cwchar", "cwctype", "cfloat", "climits",
-               "cstdint", "cstdarg", "cstddef", "cstdlib"}
+_CPP_STDLIB = {
+    "iostream",
+    "fstream",
+    "sstream",
+    "iomanip",
+    "vector",
+    "list",
+    "deque",
+    "queue",
+    "stack",
+    "map",
+    "unordered_map",
+    "set",
+    "unordered_set",
+    "algorithm",
+    "numeric",
+    "functional",
+    "memory",
+    "utility",
+    "tuple",
+    "string",
+    "array",
+    "iterator",
+    "exception",
+    "stdexcept",
+    "typeinfo",
+    "type_traits",
+    "chrono",
+    "ratio",
+    "atomic",
+    "thread",
+    "mutex",
+    "condition_variable",
+    "future",
+    "regex",
+    "random",
+    "locale",
+    "codecvt",
+    "filesystem",
+    "optional",
+    "variant",
+    "any",
+    "bitset",
+    "valarray",
+    "complex",
+    "new",
+    "cassert",
+    "cstdio",
+    "cstdlib",
+    "cstring",
+    "cmath",
+    "cerrno",
+    "ctime",
+    "cctype",
+    "cwchar",
+    "cwctype",
+    "cfloat",
+    "climits",
+    "cstdint",
+    "cstdarg",
+    "cstddef",
+}
 
 
 class CFamilyHandler(LanguageHandler):
@@ -50,7 +132,7 @@ class CFamilyHandler(LanguageHandler):
             # Angle-bracket includes: <foo> or <foo/bar>
             # These are usually stdlib, BUT third-party libs like boost, opencv,
             # eigen, gtest also use angle brackets.
-            m = re.match(r'^\s*#include\s+<([^>]+)>', line)
+            m = re.match(r"^\s*#include\s+<([^>]+)>", line)
             if m:
                 full = m.group(1)
                 top = full.split("/")[0].split(".")[0]
@@ -68,13 +150,15 @@ class CFamilyHandler(LanguageHandler):
         for m in re.finditer(r"^\s*(?!static\b)([\w][\w\s\*<>:,&]*?)\s+(\w+)\s*\([^)]*\)\s*\{", content, re.MULTILINE):
             name = m.group(2)
             if name not in {"if", "for", "while", "switch", "return", "sizeof"}:
-                count += 1; names.append(name)
+                count += 1
+                names.append(name)
         # Also count function declarations in headers (no body) — for .h files
         # Pattern: return_type function_name(...);
         for m in re.finditer(r"^\s*(?!static\b)([\w][\w\s\*<>:,&]*?)\s+(\w+)\s*\([^)]*\)\s*;", content, re.MULTILINE):
             name = m.group(2)
             if name not in names and name not in {"if", "for", "while", "switch", "return", "sizeof"}:
-                count += 1; names.append(name)
+                count += 1
+                names.append(name)
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -98,7 +182,7 @@ class CFamilyHandler(LanguageHandler):
             break
         if start < len(lines) and lines[start].strip().startswith(("/**", "/*")):
             snippet_lines = []
-            for line in lines[start:start + 30]:
+            for line in lines[start : start + 30]:
                 snippet_lines.append(line)
                 if line.strip().endswith("*/"):
                     break
@@ -109,11 +193,6 @@ class CFamilyHandler(LanguageHandler):
         # Can't reliably tell internal from external #include "..." without project structure
         return False
 
-    def _is_external_import_line(self, line: str) -> bool:
-        # #include "foo.h" is external (could be project or third-party)
-        # #include <foo.h> is stdlib (skip)
-        return bool(re.match(r'^\s*#include\s+"', line))
-
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
             return (0, True)
@@ -123,11 +202,11 @@ class CFamilyHandler(LanguageHandler):
     def get_complexity(self, content: str) -> int:
         """Regex-based cyclomatic complexity for C/C++."""
         cc = 1
-        cc += len(re.findall(r'\bif\s*\(', content))
-        cc += len(re.findall(r'\bfor\s*\(', content))
-        cc += len(re.findall(r'\bwhile\s*\(', content))
-        cc += len(re.findall(r'\bcase\s+', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
-        cc += len(re.findall(r'\?\s*[^?]', content))
+        cc += len(re.findall(r"\bif\s*\(", content))
+        cc += len(re.findall(r"\bfor\s*\(", content))
+        cc += len(re.findall(r"\bwhile\s*\(", content))
+        cc += len(re.findall(r"\bcase\s+", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
+        cc += len(re.findall(r"\?\s*[^?]", content))
         return cc

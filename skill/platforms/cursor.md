@@ -18,8 +18,8 @@ open source contributions.
 1. Walk the current repo's file tree (use the file tools — do not run shell commands to mutate).
 2. Detect the primary language by file count.
 3. For each source file, evaluate the extractable heuristics:
-   - Likely: 10-500 LOC, has docstrings, ≤3 internal imports, has tests, utility-named, no env/service dependencies.
-   - Unlikely: 2+ internal imports, > 500 LOC, no tests, hardcoded config, CLI entry points.
+   - Likely: 10+ LOC (large files get graduated penalty), has docstrings, ≤3 internal imports, has tests, utility-named, no env/service dependencies.
+   - Unlikely: 2+ internal imports, > 1000 LOC (very large), no tests, hardcoded config, CLI entry points.
 4. For each strong candidate, search GitHub via `curl https://api.github.com/search/repositories` (or use the GitHub MCP if available) for similar projects with the same language and ≥5 stars.
 5. Compare each candidate against the top 5 search results.
 6. Produce a structured report:

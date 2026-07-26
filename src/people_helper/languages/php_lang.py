@@ -1,5 +1,7 @@
 """PHP language handler."""
+
 import re
+
 from .base import LanguageHandler
 
 
@@ -23,9 +25,11 @@ class PhpHandler(LanguageHandler):
     def count_public_api(self, content: str) -> tuple:
         count, names = 0, []
         for m in re.finditer(r"^\s*(?:public\s+|protected\s+|static\s+)*function\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         for m in re.finditer(r"^\s*(?:final\s+|abstract\s+)*(?:class|interface|trait)\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -52,7 +56,7 @@ class PhpHandler(LanguageHandler):
             break
         if start < len(lines) and lines[start].strip().startswith(("/**", "/*")):
             snippet_lines = []
-            for line in lines[start:start + 30]:
+            for line in lines[start : start + 30]:
                 snippet_lines.append(line)
                 if line.strip().endswith("*/"):
                     break
@@ -60,13 +64,6 @@ class PhpHandler(LanguageHandler):
         return False, ""
 
     def is_internal_import(self, line: str, _project_modules: set) -> bool:
-        return False
-
-    def _is_external_import_line(self, line: str) -> bool:
-        if re.match(r"^\s*use\s+[\w\\]+", line):
-            return True
-        if re.match(r"^\s*(require|include)(_once)?\s+", line):
-            return True
         return False
 
     def get_dependency_weight(self, imports: list) -> tuple:
@@ -77,12 +74,12 @@ class PhpHandler(LanguageHandler):
     def get_complexity(self, content: str) -> int:
         """Regex-based cyclomatic complexity for PHP."""
         cc = 1
-        cc += len(re.findall(r'\bif\s*\(', content))
-        cc += len(re.findall(r'\bfor\s*\(', content))
-        cc += len(re.findall(r'\bwhile\s*\(', content))
-        cc += len(re.findall(r'\bcase\s+', content))
-        cc += len(re.findall(r'\bcatch\s*\(', content))
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
-        cc += len(re.findall(r'\?\s*[^?]', content))
+        cc += len(re.findall(r"\bif\s*\(", content))
+        cc += len(re.findall(r"\bfor\s*\(", content))
+        cc += len(re.findall(r"\bwhile\s*\(", content))
+        cc += len(re.findall(r"\bcase\s+", content))
+        cc += len(re.findall(r"\bcatch\s*\(", content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
+        cc += len(re.findall(r"\?\s*[^?]", content))
         return cc

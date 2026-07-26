@@ -1,40 +1,15 @@
 """JavaScript/TypeScript language handler."""
-import re
-from .base import LanguageHandler
-from ..config import JS_HEAVY, EXTERNAL_SCOPES
 
+import re
+
+from ..config import EXTERNAL_SCOPES, JS_HEAVY
+from .base import LanguageHandler
 
 _REL_IMPORT_JS = re.compile(r"""(?:from|require\()\s*['"](\.{1,2}/[\w./@\-~]+)['"]""")
-_IMPORT_FROM_RE = re.compile(r'^\s*import\s+.*from\s+["' + chr(39) + r']([\w./@\-~]+)')
-_REQUIRE_RE = re.compile(r'^\s*(?:const|let|var)\s+\w+\s*=\s*require\(["' + chr(39) + r']([\w./@\-~]+)[' + chr(39) + r']\)')
-
-
-def _strip_inline_comment_js(line: str) -> str:
-    """Strip // comments from a JS line, respecting string literals."""
-    result = []
-    i = 0
-    in_string = None
-    while i < len(line):
-        ch = line[i]
-        if in_string:
-            if ch == "\\" and i + 1 < len(line):
-                result.append(ch)
-                result.append(line[i + 1])
-                i += 2
-                continue
-            if ch == in_string:
-                in_string = None
-            result.append(ch)
-        else:
-            if ch in ('"', "'", "`"):
-                in_string = ch
-                result.append(ch)
-            elif ch == "/" and i + 1 < len(line) and line[i + 1] == "/":
-                break
-            else:
-                result.append(ch)
-        i += 1
-    return "".join(result)
+_IMPORT_FROM_RE = re.compile(r'^\s*import\s+.*from\s+["' + chr(39) + r"]([\w./@\-~]+)")
+_REQUIRE_RE = re.compile(
+    r'^\s*(?:const|let|var)\s+\w+\s*=\s*require\(["' + chr(39) + r"]([\w./@\-~]+)[" + chr(39) + r"]\)"
+)
 
 
 class JsTsHandler(LanguageHandler):
@@ -88,7 +63,8 @@ class JsTsHandler(LanguageHandler):
     def count_public_api(self, content: str) -> tuple:
         count, names = 0, []
         for m in re.finditer(r"^\s*export\s+(?:async\s+)?(?:function|class|const)\s+(\w+)", content, re.MULTILINE):
-            count += 1; names.append(m.group(1))
+            count += 1
+            names.append(m.group(1))
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:
@@ -111,7 +87,7 @@ class JsTsHandler(LanguageHandler):
             break
         if start < len(lines) and lines[start].strip().startswith("/**"):
             snippet_lines = []
-            for line in lines[start:start + 30]:
+            for line in lines[start : start + 30]:
                 snippet_lines.append(line)
                 if line.strip().endswith("*/"):
                     break
@@ -135,13 +111,6 @@ class JsTsHandler(LanguageHandler):
                 return True
         return False
 
-    def _is_external_import_line(self, line: str) -> bool:
-        if re.match(r"^\s*import\s+", line):
-            return True
-        if re.match(r"^\s*(?:const|let|var)\s+\w+\s*=\s*require\(", line):
-            return True
-        return False
-
     def get_dependency_weight(self, imports: list) -> tuple:
         if not imports:
             return (0, True)
@@ -149,9 +118,11 @@ class JsTsHandler(LanguageHandler):
         for mod in imports:
             ml = mod.lower()
             if ml in JS_HEAVY:
-                w = 3; all_stdlib = False
+                w = 3
+                all_stdlib = False
             else:
-                w = 1; all_stdlib = False
+                w = 1
+                all_stdlib = False
             max_weight = max(max_weight, w)
         return (max_weight, all_stdlib)
 
@@ -164,19 +135,19 @@ class JsTsHandler(LanguageHandler):
         """
         cc = 1
         # if / else if
-        cc += len(re.findall(r'\bif\s*\(', content))
+        cc += len(re.findall(r"\bif\s*\(", content))
         # for / while / do-while
-        cc += len(re.findall(r'\bfor\s*\(', content))
-        cc += len(re.findall(r'\bwhile\s*\(', content))
+        cc += len(re.findall(r"\bfor\s*\(", content))
+        cc += len(re.findall(r"\bwhile\s*\(", content))
         # switch case (each case adds a path)
-        cc += len(re.findall(r'\bcase\s+', content))
+        cc += len(re.findall(r"\bcase\s+", content))
         # catch
-        cc += len(re.findall(r'\bcatch\s*\(', content))
+        cc += len(re.findall(r"\bcatch\s*\(", content))
         # ternary operator
-        cc += len(re.findall(r'\?\s*[^?]', content))
+        cc += len(re.findall(r"\?\s*[^?]", content))
         # logical operators (each && or || adds a branch)
-        cc += len(re.findall(r'&&', content))
-        cc += len(re.findall(r'\|\|', content))
+        cc += len(re.findall(r"&&", content))
+        cc += len(re.findall(r"\|\|", content))
         # nullish coalescing
-        cc += len(re.findall(r'\?\?', content))
+        cc += len(re.findall(r"\?\?", content))
         return cc

@@ -35,8 +35,8 @@ If the user has a classic PAT or a fine-grained PAT with broader scopes, refuse 
 
 ## Heuristics
 
-Likely extractable: 10-500 LOC, docstrings present, ≤3 internal imports, has tests, utility-named, no env/service deps.
-Skip: 2+ internal imports, > 500 LOC, no tests, hardcoded config, CLI entry points.
+Likely extractable: 10+ LOC (large files get graduated penalty), docstrings present, ≤3 internal imports, has tests, utility-named, no env/service deps.
+Skip: 2+ internal imports, > 1000 LOC (very large), no tests, hardcoded config, CLI entry points.
 
 ## Output format
 

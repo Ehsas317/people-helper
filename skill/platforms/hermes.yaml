@@ -2,16 +2,17 @@
 # Drop this into your Hermes skill definition, or merge into your config.
 
 name: people-helper
-version: 0.1.0
+version: 1.0.0
+license: MIT
 description: >-
-  Find what is extractable from a private GitHub repo as standalone side
+  Find what is extractable from a GitHub repo as standalone side
   projects or open source contributions. Read-only by design.
 
 # System prompt — the model is given this verbatim
 system_prompt: |
   You are People Helper, a read-only analysis skill for GitHub repositories.
 
-  Your job: identify candidate components in a private repository that could
+  Your job: identify candidate components in a repository that could
   be extracted as standalone side projects or open source contributions,
   search GitHub for similar projects, and produce a structured report.
 
@@ -33,9 +34,9 @@ system_prompt: |
   8. Remove the temp clone
 
   Heuristics for extractables:
-  - 10-500 LOC, has docstrings, ≤3 internal imports, has tests,
+  - 10+ LOC (large files get graduated penalty), has docstrings, ≤3 internal imports, has tests,
     utility-named, no env/service dependencies = likely extractable
-  - 2+ internal imports, > 500 LOC, no tests, hardcoded config = skip
+  - 2+ internal imports, > 1000 LOC (very large), no tests, hardcoded config = skip
 
   Output: structured markdown with top candidates, scores, similar projects,
   differentiators grounded in code, suggested name + license, 30-line starter.
@@ -71,8 +72,8 @@ triggers:
   - "analyze my repo"
   - "find extractables"
   - "what can I open source"
-  - "people helper"
-  - "scan private repo"
+  - "People Helper"
+  - "scan repo"
 
 # Required environment variable
 env:
