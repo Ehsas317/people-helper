@@ -245,10 +245,44 @@ determined by you per the scenarios above.
 
 
 def _generate_readme(name: str, candidate: Candidate, source_repo: str, tags: list) -> str:
-    """Generate a README.md with usage and attribution."""
+    """Generate a README.md with usage and attribution (language-aware)."""
     what_it_does = candidate.what_it_does or "Extracted utility"
     tags_str = " ".join(f"`{t}`" for t in tags) if tags else "utility"
     gh_user = _get_github_username(source_repo)
+    
+    # Language-specific installation and usage examples
+    ext = Path(candidate.path).suffix.lower()
+    if ext == ".py":
+        install = f"pip install {name}"
+        usage = f"""```python
+import {name.replace("-", "_")}
+```"""
+    elif ext in {".ts", ".tsx", ".js", ".jsx"}:
+        install = f"npm install {name}"
+        usage = f"""```javascript
+import {{ /* exports */ }} from '{name}';
+// or
+const {{ /* exports */ }} = require('{name}');
+```"""
+    elif ext == ".rs":
+        install = f"""Add to your `Cargo.toml`:
+```toml
+[dependencies]
+{name} = "0.1.0"
+```"""
+        usage = f"""```rust
+use {name.replace("-", "_")}::*;
+```"""
+    elif ext == ".go":
+        install = f"go get github.com/{gh_user}/{name}"
+        usage = f"""```go
+import "{gh_user}/{name}"
+```"""
+    else:
+        # Fallback for other languages
+        install = "(See your language's package manager)"
+        usage = "(See the source file for usage examples)"
+    
     return f"""# {name}
 
 {what_it_does}
@@ -256,14 +290,12 @@ def _generate_readme(name: str, candidate: Candidate, source_repo: str, tags: li
 ## Installation
 
 ```bash
-pip install {name}
+{install}
 ```
 
 ## Usage
 
-```python
-import {name.replace("-", "_")}
-```
+{usage}
 
 ## License
 
@@ -367,10 +399,38 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
                     shutil.move(str(sib_file), str(pkg_subdir / sib_file.name))
         elif ext in {".ts", ".tsx", ".js", ".jsx"}:
             (pkg_dir / "package.json").write_text(_generate_package_json(name, candidate, tags, source_repo), encoding="utf-8")
+            # Create src/ directory and move extracted file there (JS/TS convention)
+            src_dir = pkg_dir / "src"
+            src_dir.mkdir(exist_ok=True)
+            main_file = pkg_dir / Path(candidate.path).name
+            if main_file.exists():
+                shutil.move(str(main_file), str(src_dir / main_file.name))
+            # Move sibling files too
+            for sib in candidate.sibling_paths:
+                sib_file = pkg_dir / Path(sib).name
+                if sib_file.exists():
+                    shutil.move(str(sib_file), str(src_dir / sib_file.name))
+            # Create index.js/index.ts that re-exports the main file
+            main_name = Path(candidate.path).stem
+            index_content = f"// Auto-generated index — adjust as needed\nexport * from './src/{main_name}';\n"
+            (pkg_dir / "index.js").write_text(index_content, encoding="utf-8")
         elif ext == ".rs":
             (pkg_dir / "Cargo.toml").write_text(_generate_cargo_toml(name, candidate, tags, source_repo), encoding="utf-8")
+            # Create src/ directory and move extracted file there (Rust convention)
+            src_dir = pkg_dir / "src"
+            src_dir.mkdir(exist_ok=True)
+            main_file = pkg_dir / Path(candidate.path).name
+            if main_file.exists():
+                # Rename to lib.rs for library crates
+                shutil.move(str(main_file), str(src_dir / "lib.rs"))
+            # Move sibling files too
+            for sib in candidate.sibling_paths:
+                sib_file = pkg_dir / Path(sib).name
+                if sib_file.exists():
+                    shutil.move(str(sib_file), str(src_dir / Path(sib).name))
         elif ext == ".go":
             (pkg_dir / "go.mod").write_text(_generate_go_mod(name, candidate, source_repo), encoding="utf-8")
+            # Go packages don't require a specific directory structure for single files
 
         # Generate README
         (pkg_dir / "README.md").write_text(_generate_readme(name, candidate, source_repo, tags), encoding="utf-8")

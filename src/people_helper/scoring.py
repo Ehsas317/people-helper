@@ -29,19 +29,22 @@ def _large_file_penalty(loc: int) -> float:
 
     Returns a penalty in the range [0.0, 1.0] that scales linearly:
     - 500 LOC → 0.0 (no penalty, sweet spot ceiling)
-    - 650 LOC → 0.1 (1 bracket over)
-    - 800 LOC → 0.2
-    - 950 LOC → 0.3
+    - 501-650 LOC → -0.1 (1 bracket over)
+    - 651-800 LOC → -0.2
+    - 801-950 LOC → -0.3
     - ...0.1 per 150 extra LOC
-    - 2000 LOC → 1.0 (capped)
+    - 2000 LOC → -1.0 (capped)
 
+    Uses ceiling division to ensure even 1 LOC over 500 gets penalized.
     This replaces the old hard 500-LOC skip with a graduated penalty so large
     but genuinely standalone utilities can still be detected (just scored lower).
     """
     if loc <= 500:
         return 0.0
-    brackets = (loc - 500) // 150
-    return min(1.0, brackets * 0.1)
+    overage = loc - 500
+    # Ceiling division: (overage + 149) // 150 gives 1 for 1-150, 2 for 151-300, etc.
+    brackets = (overage + 149) // 150
+    return -min(1.0, brackets * 0.1)
 
 
 def _compute_code_quality(cand) -> float:
@@ -268,10 +271,9 @@ def _compute_maintainability(cand) -> float:
     # No hard LOC ceiling in detection.py — this soft penalty lets large
     # but genuinely standalone files be detected, just with a lower score.
     # Examples: 501-650 LOC → -0.1, 651-800 → -0.2, 801-950 → -0.3, 2000 → -1.0
+    # Consistent with _large_file_penalty() in code quality.
     if cand.loc > 500:
-        overage = cand.loc - 500
-        # Ceiling division: (overage + 149) // 150 gives 1 for 1-150, 2 for 151-300, etc.
-        penalty = -0.1 * ((overage + 149) // 150)
+        penalty = _large_file_penalty(cand.loc)
         score += penalty
     if cand.has_tests:
         score += 0.5
