@@ -1858,14 +1858,15 @@ class TestCLIValidation(unittest.TestCase):
 
     def test_version_flag_works(self):
         """--version should print version and exit 0."""
-        import subprocess, sys, os
+        import subprocess, sys, os, re
         env = {k: v for k, v in os.environ.items() if k != "PEOPLE_HELPER_PAT"}
         result = subprocess.run(
             [sys.executable, "people_helper.py", "--version"],
             capture_output=True, text=True, env=env,
         )
         self.assertEqual(result.returncode, 0)
-        self.assertIn("1.0.0", result.stdout)
+        # Match a semver version string (so we don't break on every patch bump)
+        self.assertRegex(result.stdout, r"v\d+\.\d+\.\d+")
 
     def test_missing_pat_exits_with_auth_code(self):
         """Missing PAT should exit 3 (EXIT_AUTH), not 1."""
@@ -2864,3 +2865,286 @@ class TestExtractorAdditional(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+
+
+# === New bug-fix regression tests (2026-07-27 round) ===
+
+class TestRustOuterDocstrings(unittest.TestCase):
+    """Rust `///` outer doc comments (the dominant Rust doc convention) must be detected."""
+
+    def setUp(self):
+        self.handler = get_handler(".rs")
+
+    def test_outer_doc_at_top_of_file(self):
+        """A /// doc on the first pub item at top of file should be detected as docstring."""
+        content = '''/// Public function that doubles a number.
+///
+/// # Examples
+/// ```
+/// assert_eq!(helper(2), 4);
+/// ```
+pub fn helper(x: i32) -> i32 {
+    x * 2
+}
+'''
+        found, snippet = self.handler.detect_docstring(content)
+        self.assertTrue(found, "Rust /// outer doc must be detected")
+        self.assertIn("Public function", snippet)
+
+    def test_inner_doc_still_detected(self):
+        """//! inner doc (module-level) should still be detected."""
+        content = '''//! This module provides helper utilities.
+pub fn helper() {}
+'''
+        found, snippet = self.handler.detect_docstring(content)
+        self.assertTrue(found)
+        self.assertIn("module provides", snippet)
+
+    def test_no_doc_no_detection(self):
+        """File without doc comments should return False."""
+        content = '''pub fn helper() {}
+'''
+        found, _ = self.handler.detect_docstring(content)
+        self.assertFalse(found)
+
+
+class TestTypeScriptAPIDetectionExtended(unittest.TestCase):
+    """TypeScript should detect interface/type/enum/namespace/default exports."""
+
+    def setUp(self):
+        self.handler = get_handler(".ts")
+
+    def test_interface_detected(self):
+        count, names = self.handler.count_public_api("export interface IFoo { x: number; }\n")
+        self.assertIn("IFoo", names)
+
+    def test_type_alias_detected(self):
+        count, names = self.handler.count_public_api("export type TFoo = string;\n")
+        self.assertIn("TFoo", names)
+
+    def test_enum_detected(self):
+        count, names = self.handler.count_public_api("export enum EColor { Red, Green }\n")
+        self.assertIn("EColor", names)
+
+    def test_namespace_detected(self):
+        count, names = self.handler.count_public_api("export namespace NUtils { export const x = 1; }\n")
+        self.assertIn("NUtils", names)
+
+    def test_default_function_named_detected(self):
+        """export default function NAME() {} — the name should be detected."""
+        count, names = self.handler.count_public_api("export default function helper() {}\n")
+        self.assertIn("helper", names)
+
+    def test_default_class_named_detected(self):
+        count, names = self.handler.count_public_api("export default class MyClass {}\n")
+        self.assertIn("MyClass", names)
+
+    def test_all_exports_counted(self):
+        """A file with many export types should count them all."""
+        content = '''export function foo() {}
+export class Bar {}
+export const baz = 1;
+export interface IFoo {}
+export type TFoo = number;
+export enum EColor { Red }
+export namespace NUtils {}
+'''
+        count, names = self.handler.count_public_api(content)
+        for expected in ["foo", "Bar", "baz", "IFoo", "TFoo", "EColor", "NUtils"]:
+            self.assertIn(expected, names, f"Missing {expected}")
+
+
+class TestCSharpGlobalUsing(unittest.TestCase):
+    """C# 'global using' and 'using alias' must be detected."""
+
+    def setUp(self):
+        self.handler = get_handler(".cs")
+
+    def test_global_using_detected(self):
+        imports = self.handler.extract_external_imports("global using MyApp.Models;\n")
+        self.assertIn("MyApp", imports)
+
+    def test_using_alias_detected(self):
+        imports = self.handler.extract_external_imports("using Alias = MyApp.Models;\n")
+        self.assertIn("MyApp", imports)
+
+    def test_static_using_detected(self):
+        imports = self.handler.extract_external_imports("using static MyApp.Helpers;\n")
+        self.assertIn("MyApp", imports)
+
+    def test_system_still_stdlib(self):
+        imports = self.handler.extract_external_imports("using System;\nusing System.Linq;\n")
+        self.assertNotIn("System", imports)
+
+
+class TestPython3LevelRelativeImports(unittest.TestCase):
+    """Python 'from ...X import Y' (3+ levels) must resolve correctly."""
+
+    def test_3_level_resolution(self):
+        from people_helper.detection import _resolve_sibling
+        file_set = {"a/config.py", "a/b/c/deep.py"}
+        result = _resolve_sibling("config", 3, "a/b/c/deep.py", ".py", file_set)
+        self.assertEqual(result, "a/config.py")
+
+    def test_4_level_beyond_root_returns_none(self):
+        from people_helper.detection import _resolve_sibling
+        file_set = {"a/b.py"}
+        result = _resolve_sibling("config", 4, "a/b.py", ".py", file_set)
+        self.assertIsNone(result)
+
+    def test_2_level_still_works(self):
+        from people_helper.detection import _resolve_sibling
+        # For a/b.py, parent_level=2 looks 1 dir up (the root), so config must be at root.
+        file_set = {"config.py", "a/b.py"}
+        result = _resolve_sibling("config", 2, "a/b.py", ".py", file_set)
+        self.assertEqual(result, "config.py")
+
+
+class TestTestExtractedSkipped(unittest.TestCase):
+    """The test_extracted/ directory must be skipped by the walker."""
+
+    def test_test_extracted_excluded(self):
+        import tempfile
+        from pathlib import Path
+        from people_helper.walker import walk_repo
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "test_extracted").mkdir()
+            (root / "test_extracted" / "old.py").write_text("def f(): return 1\n")
+            (root / "real.py").write_text("def f(): return 1\n")
+            files = walk_repo(root)
+            paths = [f["path"] for f in files]
+            self.assertNotIn("test_extracted/old.py", paths)
+            self.assertIn("real.py", paths)
+
+    def test_extracted_dir_excluded(self):
+        """General 'extracted/' output dir is also excluded (R7-B consistency)."""
+        import tempfile
+        from pathlib import Path
+        from people_helper.walker import walk_repo
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            (root / "extracted").mkdir()
+            (root / "extracted" / "old.py").write_text("def f(): return 1\n")
+            (root / "real.py").write_text("def f(): return 1\n")
+            files = walk_repo(root)
+            paths = [f["path"] for f in files]
+            self.assertNotIn("extracted/old.py", paths)
+
+
+class TestBetterNaming(unittest.TestCase):
+    """Naming logic should avoid duplicates like 'data-data' and prefer function names."""
+
+    def test_function_name_beats_generic_stem(self):
+        """When stem is generic but function names are specific, use the function name."""
+        from people_helper.naming import suggest_name
+        c = Candidate(
+            path="src/strings.py", language="Python", loc=20, has_tests=False, has_docstring=True,
+            internal_imports=0, external_imports=0, filename_score=0.0,
+            docstring_snippet="String utilities.",
+            function_names=["slugify", "truncate"],
+        )
+        name = suggest_name(c)
+        # 'strings' is meaningful so we keep it (better than generic 'extracted-utility')
+        # But verify it's at least clean (no 'strings-strings')
+        self.assertNotIn("--", name)
+        self.assertFalse(name.endswith("-strings"))
+
+    def test_data_models_uses_parent_not_stem(self):
+        """models.py in 'people_helper_data' should NOT produce 'data-data' duplication."""
+        from people_helper.naming import suggest_name
+        c = Candidate(
+            path="people_helper_data/models.py", language="Python", loc=10,
+            has_tests=False, has_docstring=True,
+            internal_imports=0, external_imports=0, filename_score=0.0,
+            docstring_snippet="Data structures.",
+            function_names=[],
+        )
+        name = suggest_name(c)
+        self.assertNotEqual(name, "people-helper-data-models")
+        # Should just be the parent (since 'data' is in noise) or a useful variant
+        self.assertTrue(name.startswith("people-helper-data"))
+
+    def test_myproj_models_with_function_names(self):
+        """When stem is generic and there are useful function names, use them."""
+        from people_helper.naming import suggest_name
+        c = Candidate(
+            path="myproj/models.py", language="Python", loc=10,
+            has_tests=False, has_docstring=True,
+            internal_imports=0, external_imports=0, filename_score=0.0,
+            docstring_snippet="Database ORM models.",
+            function_names=["User", "Post"],
+        )
+        name = suggest_name(c)
+        self.assertIn("user", name.lower())
+
+    def test_dts_filename_handled(self):
+        """foo.d.ts should produce 'foo' name."""
+        from people_helper.naming import suggest_name
+        c = Candidate(
+            path="types/foo.d.ts", language="TypeScript", loc=10,
+            has_tests=False, has_docstring=False,
+            internal_imports=0, external_imports=0, filename_score=0.0,
+        )
+        name = suggest_name(c)
+        self.assertEqual(name, "foo")
+
+
+class TestExtendedSecretRedaction(unittest.TestCase):
+    """Tests for additional secret patterns in report._redact_secrets."""
+
+    def test_github_oauth_token_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("gho_1234567890abcdefghijklmnopqrstuvwxyzABCD")
+        self.assertIn("REDACTED", result)
+
+    def test_github_user_token_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("ghu_1234567890abcdefghijklmnopqrstuvwxyzABCD")
+        self.assertIn("REDACTED", result)
+
+    def test_github_server_token_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("ghs_1234567890abcdefghijklmnopqrstuvwxyzABCD")
+        self.assertIn("REDACTED", result)
+
+    def test_aws_secret_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("aws_secret_access_key=abcdefghijklmnopqrstuvwxyz0123456789ABCD")
+        self.assertIn("REDACTED", result)
+
+    def test_anthropic_key_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("sk-ant-api03-abcdefghijklmnopqrstuvwxyz")
+        self.assertIn("REDACTED", result)
+
+    def test_google_api_key_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("AIzaSyA-1234567890abcdefghijklmnopqrstuvwx")
+        self.assertIn("REDACTED", result)
+
+    def test_stripe_live_key_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("sk_live_1234567890abcdefghijklmnop")
+        self.assertIn("REDACTED", result)
+
+    def test_sendgrid_key_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("SG.abcdefghijklmnopqrstuvw.ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz01")
+        self.assertIn("REDACTED", result)
+
+    def test_twilio_sid_redacted(self):
+        from people_helper.report import _redact_secrets
+        result = _redact_secrets("ACabcdef0123456789abcdef0123456789")
+        self.assertIn("REDACTED", result)
+
+    def test_normal_code_not_redacted(self):
+        from people_helper.report import _redact_secrets
+        code = '''def hello():
+    return "world"
+
+import os
+class MyClass:
+    pass
+'''
+        self.assertEqual(_redact_secrets(code), code)

@@ -62,9 +62,20 @@ class JsTsHandler(LanguageHandler):
 
     def count_public_api(self, content: str) -> tuple:
         count, names = 0, []
-        for m in re.finditer(r"^\s*export\s+(?:async\s+)?(?:function|class|const)\s+(\w+)", content, re.MULTILINE):
-            count += 1
-            names.append(m.group(1))
+        # Match: export function/class/const/let/var/interface/type/enum/namespace
+        # Also: export default function/class/... (anonymous default doesn't add to count
+        # unless there's a name we can extract).
+        for m in re.finditer(
+            r"^\s*export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var|interface|type|enum|namespace)\s+(\w+)",
+            content,
+            re.MULTILINE,
+        ):
+            name = m.group(1)
+            if name in {"default"}:  # 'export default { ... }' has no identifier
+                continue
+            if name not in names:
+                count += 1
+                names.append(name)
         return (count, names)
 
     def detect_docstring(self, content: str) -> tuple:

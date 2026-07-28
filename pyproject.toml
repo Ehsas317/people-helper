@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "people-helper"
-version = "1.0.0"
+version = "1.0.1"
 description = "Find code worth extracting — and verify it's actually standalone."
 readme = "README.md"
 requires-python = ">=3.10"

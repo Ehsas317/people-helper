@@ -47,6 +47,8 @@ SKIP_DIRS = {
     "_vendor",
     "bower_components",
     "jspm_packages",
+    "test_extracted",
+    "extracted",
 }
 
 SKIP_EXTS = {
