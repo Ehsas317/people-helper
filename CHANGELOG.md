@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - **LOC scoring: removed hard 500-LOC cutoff.** Files >500 LOC are no longer silently skipped. Instead, they get a graduated maintainability penalty: -0.1 per 150 LOC over 500 (e.g. 650 LOC → -0.1, 800 → -0.2, 950 → -0.3, 2000 → -1.0). Large but genuinely standalone files can now be detected, just with a lower score. The minimum sanity check (<10 LOC) remains.
+- **Naming heuristic smarter for generic stems.** `models.py` in `people_helper_data/` no longer suggests `people-helper-data-models` or `people-helper-data-data` — the parent directory name is used directly when the generic stem would produce a redundant suffix. Function/class names from the source file are now preferred over docstring words when both are available.
+- **Report now includes an "At a glance" summary block** showing extraction type counts (single/multi/blocked), total LOC across candidates, average cyclomatic complexity, stdlib-only ratio, and license-absence warnings.
+
+### Added
+- **More secret patterns auto-redacted in report previews.** Now also catches: GitHub user/server/refresh tokens (`ghu_`, `ghs_`, `ghr_`), Anthropic API keys (`sk-ant-`), Google API keys (`AIza...`), Stripe live keys (`sk_live_`/`pk_live_`), SendGrid keys, Twilio SIDs, and long high-entropy hex strings.
+- **`test_extracted/` and `extracted/` added to walker `SKIP_DIRS`** — the walker no longer scans its own test outputs (was previously scoring `test_extracted/*.py` files as real candidates when present in the repo).
+
+### Fixed
+- **Rust `///` outer doc comments now detected** (was previously only detecting `//!` inner docs). Rust libraries primarily use `///` to document functions/structs, so most Rust docstrings were silently missed.
+- **Python 3-level deep relative imports** (`from ...X import Y`) now resolve correctly. Previously only 1- and 2-level imports were handled; deeper imports would return `None` instead of finding the sibling file.
+- **TypeScript `count_public_api` now detects `interface`, `type`, `enum`, `namespace`, and `default` exports.** Previously only `function`, `class`, and `const` were matched — meaning TypeScript files full of `interface IFoo {}` exports were reported as having zero public API.
+- **C# `global using` and `using alias` now detected.** C# 10+'s `global using MyApp.Models;` was silently dropped by the import regex (which expected `using` at line start). C# 12's `using Alias = MyApp.X;` alias form was also missed.
+- **Removed stale `test_extracted/` directory from the repo** (leftover from a prior manual run) and added it to `.gitignore` so it doesn't reappear.
+
 
 ### Fixed
 - **Multi-file Python extraction bug**: siblings now moved into the package subdir alongside the main file (was previously leaving siblings at the package root, breaking relative imports like `from .compat import X`).

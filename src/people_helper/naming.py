@@ -12,71 +12,121 @@ GENERIC_NAMES = {
     "utils",
     "util",
     "helpers",
+    "helper",
     "common",
     "lib",
     "types",
     "constants",
     "config",
+    "conf",
     "api",
     "models",
+    "model",
     "schema",
     "db",
     "auth",
     "middleware",
     "mod",
     "init",
-    "conf",
+    "test",
+    "spec",
+    "data",
+    "struct",
+    "structures",
+    "types",
+    "interfaces",
+    "impl",
+    "base",
+    "core",
+    "shared",
 }
+
+# Directory names that are conventional code-organisation (don't include them in
+# the package name — they describe WHERE the code lives, not WHAT it does).
+NEUTRAL_DIRS = {".", "src", "lib", "app", "pkg", "crates", "compiler", "internal", "core", "include"}
+
+
+def _docstring_hint(docstring_snippet: str, function_names: list) -> str:
+    """Extract a useful word from the docstring OR function names to disambiguate
+    generic filenames like models.py or utils.py.
+
+    Preference order:
+      1. A distinctive function/class name (often the best signal)
+      2. A non-noise word from the docstring
+    """
+    noise = {
+        "the", "this", "that", "module", "class", "function", "and", "for",
+        "with", "from", "file", "import", "export", "const", "let", "var",
+        "return", "package", "provides", "data", "structure", "structures",
+        "type", "types", "object", "objects", "utility", "utilities", "helper",
+    }
+    # Try function/class names first — usually the most specific
+    for name in function_names or []:
+        if name and name.lower() not in noise and len(name) >= 3 and not name.startswith("_"):
+            return name.lower()
+    # Fall back to docstring words
+    if docstring_snippet:
+        for w in re.findall(r"[A-Za-z][A-Za-z0-9-]{2,}", docstring_snippet):
+            if w.lower() not in noise:
+                return w.lower()
+    return ""
+
+
+def _stem_already_in_parent(stem: str, parent: str) -> bool:
+    """True when the parent directory name already conveys the stem meaning,
+    e.g. parent='people_helper_data' + stem='models' would yield
+    'people-helper-data-models' which is redundant — 'data' already implies models.
+
+    Heuristic: if the cleaned parent ends with the cleaned stem (or vice versa),
+    or if they share a key noun, skip the stem suffix to avoid 'data-data' style names.
+    """
+    if not parent or not stem:
+        return False
+    p, s = _clean(parent), _clean(stem)
+    if not p or not s:
+        return False
+    # If parent ends with stem (e.g. 'app-data' + 'data' → redundant)
+    if p.endswith("-" + s) or p == s:
+        return True
+    # If the last meaningful component of parent equals the stem
+    last_part = p.rsplit("-", 1)[-1]
+    return last_part == s
 
 
 def suggest_name(cand) -> str:
     p = Path(cand.path)
     stem, parent = p.stem, p.parent.name
+    # Special-case Rust mod.rs / lib.rs → use parent dir name
     if stem in {"mod", "lib"}:
-        if parent and parent not in {".", "src", "lib", "app", "pkg"}:
+        if parent and parent not in NEUTRAL_DIRS:
             return _clean(parent)
         for ancestor in reversed(p.parents):
             aname = ancestor.name
-            if aname and aname not in {".", "src", "lib", "app", "pkg", "crates", "compiler", ""}:
+            if aname and aname not in NEUTRAL_DIRS and aname != "":
                 return _clean(aname)
+    # Strip .d.ts extension for naming purposes
     if p.name.endswith(".d.ts"):
         stem = p.name[:-5]
+    # CamelCase / PascalCase → kebab-case
     stem_split = re.sub(r"([a-z0-9])([A-Z])", r"\1-\2", stem)
     stem_split = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1-\2", stem_split)
-    if stem.lower() in GENERIC_NAMES and parent and parent not in {".", "src", "lib", "app", "pkg"}:
-        hint = ""
-        if cand.docstring_snippet:
-            noise = {
-                "the",
-                "this",
-                "that",
-                "module",
-                "class",
-                "function",
-                "and",
-                "for",
-                "with",
-                "from",
-                "file",
-                "import",
-                "export",
-                "const",
-                "let",
-                "var",
-                "return",
-                "package",
-                "provides",
-            }
-            for w in re.findall(r"[A-Za-z][A-Za-z0-9-]{2,}", cand.docstring_snippet):
-                if w.lower() not in noise:
-                    hint = w.lower()
-                    break
-        return _clean(f"{parent}-{hint}") if hint else _clean(parent)
-    if stem.lower() in GENERIC_NAMES:
-        if parent and parent not in {".", "src", "lib", "app", "pkg"}:
-            return _clean(f"{parent}-{stem}")
-        return "extracted-utility"
-    return _clean(stem_split) or "extracted-utility"
+    stem_split = stem_split.lower()
+    # If stem is meaningful, use it directly
+    if stem.lower() not in GENERIC_NAMES:
+        return _clean(stem_split) or "extracted-utility"
+    # Generic stem: try parent + hint
+    if parent and parent not in NEUTRAL_DIRS:
+        hint = _docstring_hint(cand.docstring_snippet, getattr(cand, "function_names", []))
+        if hint and not _stem_already_in_parent(hint, parent):
+            return _clean(f"{parent}-{hint}")
+        # Parent already conveys the meaning (e.g. 'people_helper_data' + 'models.py' → 'people-helper-data')
+        # Don't append the stem to avoid 'data-data' style duplicates.
+        return _clean(parent)
+    # No useful parent: try hint only
+    hint = _docstring_hint(cand.docstring_snippet, getattr(cand, "function_names", []))
+    if hint:
+        return _clean(hint)
+    return "extracted-utility"
 
 
 def _clean(s: str) -> str:

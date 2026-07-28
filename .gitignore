@@ -1,6 +1,8 @@
 # Environment
 .env
 *.local
+.venv/
+venv/
 
 # Reports (often contain private info)
 report.md
@@ -11,6 +13,7 @@ test_report.md
 # Extracted packages (often contain private source code)
 extracted/
 output/
+test_extracted/
 
 
 # Python

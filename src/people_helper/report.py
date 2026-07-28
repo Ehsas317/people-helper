@@ -15,13 +15,40 @@ from .models import Candidate
 # Regex patterns for common secrets that might appear in source code first_lines.
 # If matched, the match is replaced with ***REDACTED***.
 _SECRET_PATTERNS = [
-    re.compile(r"gh[pousr]_[A-Za-z0-9]{36,255}"),  # GitHub PAT (classic + fine-grained)
-    re.compile(r"github_pat_[A-Za-z0-9_]{82,255}"),  # GitHub fine-grained PAT
-    re.compile(r"AKIA[0-9A-Z]{16}"),  # AWS access key
-    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),  # Slack token
-    re.compile(r"sk-[A-Za-z0-9]{20,}"),  # OpenAI / generic API key
-    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),  # PEM private key header
-    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),  # JWT
+    # GitHub classic PATs (ghp_, gho_, ghu_, ghs_, ghr_)
+    re.compile(r"gh[pousr]_[A-Za-z0-9]{36,255}"),
+    # GitHub fine-grained PAT
+    re.compile(r"github_pat_[A-Za-z0-9_]{82,255}"),
+    # AWS access key
+    re.compile(r"AKIA[0-9A-Z]{16}"),
+    # AWS secret access key (heuristic — 40 base64-ish chars after 'aws_secret' or similar)
+    re.compile(r"(?i)aws[_\-]?secret[_\-]?(?:access[_\-]?)?key['\"\s:=]+([A-Za-z0-9/+=]{40})"),
+    # Slack tokens (xoxb-, xoxp-, xoxa-, xoxr-, xoxs-)
+    re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),
+    # OpenAI / generic sk- key
+    re.compile(r"sk-[A-Za-z0-9]{20,}"),
+    # Anthropic API key
+    re.compile(r"sk-ant-[A-Za-z0-9\-]{20,}"),
+    # Google API key (AIza...)
+    re.compile(r"AIza[0-9A-Za-z\-_]{35}"),
+    # Stripe keys (pk_live_, sk_live_, rk_live_)
+    re.compile(r"[psr]k_(?:live|test)_[A-Za-z0-9]{20,}"),
+    # PEM private keys
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
+    # JWTs (3 base64url segments)
+    re.compile(r"eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}"),
+    # Heroku API key (UUID-like, 36 chars)
+    re.compile(r"(?i)heroku[_\-]?api[_\-]?key['\"\s:=]+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"),
+    # Twilio Account SID
+    re.compile(r"AC[a-f0-9]{32}"),
+    # SendGrid API key
+    re.compile(r"SG\.[A-Za-z0-9_\-]{20,30}\.[A-Za-z0-9_\-]{40,}"),
+    # npm token
+    re.compile(r"npm_[A-Za-z0-9]{36}"),
+    # Discord bot token
+    re.compile(r"[MN][A-Za-z0-9]{23,}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,}"),
+    # Generic high-entropy hex token (64+ chars) — last resort, may have false positives
+    re.compile(r"(?<![A-Za-z0-9])[a-f0-9]{64,}(?![A-Za-z0-9])"),
 ]
 
 
@@ -73,6 +100,18 @@ def generate_report(
         active = filtered
     skipped = [c for c in candidates if c.skipped]
 
+    # Summary stats — help the user understand the scan at a glance
+    skipped_list = [c for c in candidates if c.skipped]
+    extraction_counts = {"single": 0, "multi": 0, "blocked": 0}
+    for c in active:
+        if c.extraction_type in extraction_counts:
+            extraction_counts[c.extraction_type] += 1
+    total_loc = sum(c.loc for c in active)
+    avg_complexity = sum(c.complexity for c in active) / max(len(active), 1)
+    stdlib_only_count = sum(1 for c in active if c.is_stdlib_only)
+    no_license_count = sum(1 for c in active if not c.source_has_license)
+    multi_or_blocked = extraction_counts["multi"] + extraction_counts["blocked"]
+
     lines: list[str] = [
         "# People Helper Report\n",
         f"**Repo:** {owner}/{name}",
@@ -88,6 +127,27 @@ def generate_report(
         "+ 0.15 × relevance + 0.15 × maintainability + 0.10 × demand signal"
     )
     lines.append("")
+    # Add a compact summary block when there are candidates
+    if active:
+        lines.append("## At a glance")
+        lines.append("")
+        lines.append(f"- **Verified single-file (✅):** {extraction_counts['single']}")
+        lines.append(f"- **Multi-file needed (⚠):** {extraction_counts['multi']}")
+        if extraction_counts["blocked"] > 0:
+            lines.append(f"- **Blocked (⛔):** {extraction_counts['blocked']}")
+        lines.append(f"- **Total LOC across candidates:** {total_loc:,}")
+        lines.append(f"- **Average cyclomatic complexity:** {avg_complexity:.1f}")
+        if stdlib_only_count:
+            lines.append(f"- **Stdlib-only candidates:** {stdlib_only_count}/{len(active)}")
+        if no_license_count:
+            lines.append(
+                f"- **⚠ No source license:** {no_license_count}/{len(active)} candidates — extraction is legally risky"
+            )
+        if multi_or_blocked > 0:
+            lines.append(
+                f"- **Heads-up:** {multi_or_blocked} candidate(s) need sibling files or are blocked — review before extracting"
+            )
+        lines.append("")
 
     if not active:
         if not candidates:

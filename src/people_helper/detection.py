@@ -87,11 +87,22 @@ def has_test_for(file_path: str, all_files: set) -> bool:
 
 
 def _resolve_sibling(sib_name: str, parent_level: int, file_path: str, ext: str, file_set: set) -> str | None:
-    """Try to find the sibling file in the directory `parent_level` dirs up."""
+    """Try to find the sibling file in the directory `parent_level` dirs up.
+
+    `parent_level` semantics: the number of dots in the relative import.
+      - parent_level=1 → `from .x import y` → sibling in same directory
+      - parent_level=2 → `from ..x import y` → sibling in parent directory
+      - parent_level=3 → `from ...x import y` → sibling in grandparent directory
+    """
     p = Path(file_path)
     target_dir = p.parent
-    for _ in range(parent_level - 1):
+    for _ in range(max(parent_level - 1, 0)):
         target_dir = target_dir.parent
+    # If parent_level pushes us above the repo root, the import is unsatisfiable
+    if target_dir == Path(".") or str(target_dir) == "":
+        # Walked all the way to (or past) the root — can't resolve
+        if parent_level > len(p.parts):
+            return None
     target_str = str(target_dir)
     # IMPORTANT: file paths in file_set use forward slashes (git convention).
     # On Windows, Path / operator produces backslashes, which won't match.

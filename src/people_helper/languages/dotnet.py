@@ -19,11 +19,13 @@ class DotNetHandler(LanguageHandler):
     def extract_external_imports(self, content: str) -> list:
         imports = []
         for line in content.splitlines():
-            m = re.match(r"^\s*using\s+([\w.]+)\s*;", line)
+            # C# 10+ supports 'global using' (file-scoped global usings).
+            # C# 12+ also supports 'using alias = ...'. Match both forms.
+            m = re.match(r"^\s*(?:global\s+)?using\s+(?:static\s+)?(?:(\w+)\s*=\s*)?([\w.]+)\s*;", line)
             if m:
-                full = m.group(1)
-                # System.* is stdlib
-                if full.startswith("System") or full in {"Microsoft"}:
+                full = m.group(2)
+                # System.* and Microsoft.* are stdlib (Microsoft is the namespace root)
+                if full.startswith("System") or full.split(".")[0] == "Microsoft":
                     continue
                 mod = full.split(".")[0]
                 if mod and mod not in imports:

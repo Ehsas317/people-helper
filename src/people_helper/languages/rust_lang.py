@@ -59,9 +59,16 @@ class RustHandler(LanguageHandler):
         lines = content.splitlines()
         if not lines:
             return False, ""
+        # Rust supports two kinds of doc comments:
+        #   //!  — inner doc comment (documents the enclosing item, used at module level)
+        #   ///  — outer doc comment (documents the next item, used on functions/structs)
+        # We treat BOTH as module-level documentation if they appear at the top of the file.
+        # Most Rust libraries use /// on their first pub item, which lands at the top of the
+        # file when the file is a single-purpose module.
         comment_block = []
-        for line in lines[:20]:
-            if line.strip().startswith("//!"):
+        for line in lines[:30]:
+            stripped = line.strip()
+            if stripped.startswith(("///", "//!")):
                 comment_block.append(line)
             elif comment_block:
                 break

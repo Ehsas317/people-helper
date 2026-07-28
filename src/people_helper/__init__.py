@@ -13,7 +13,7 @@ Public API:
     __version__        — package version string
 """
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"
 
 # Re-export the public API so library users can `from people_helper import ...`
 # without reaching into internal modules.
