@@ -20,7 +20,9 @@ class GoHandler(LanguageHandler):
             # Match: import "github.com/user/repo"  (single-line form)
             m = re.match(r'^\s*(?:import\s+)?"([\w./\-]+)"', line)
             if m and "/" in m.group(1):
-                mod = m.group(1).split("/")[0]
+                # Return the full import path (not just the first component)
+                # so get_dependency_weight can check for heavy packages like "gin"
+                mod = m.group(1)
                 if mod and mod not in imports:
                     imports.append(mod)
         return imports
@@ -92,9 +94,13 @@ class GoHandler(LanguageHandler):
         max_weight, all_stdlib = 0, True
         for mod in imports:
             ml = mod.lower()
-            if ml in GO_STDLIB:
+            # Check if stdlib (exact match against the first path component)
+            first_part = ml.split("/")[0]
+            if first_part in GO_STDLIB:
                 w = 0
-            elif ml in GO_HEAVY or "k8s.io" in ml:
+            # Check if heavy — use substring match on full path so
+            # "github.com/gin-gonic/gin" matches "gin" in GO_HEAVY
+            elif any(h in ml for h in GO_HEAVY) or "k8s.io" in ml:
                 w = 3
                 all_stdlib = False
             else:

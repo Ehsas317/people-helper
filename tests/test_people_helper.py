@@ -179,7 +179,9 @@ class TestGoHandler(unittest.TestCase):
 
     def test_external_with_slash_detected(self):
         imports = self.handler.extract_external_imports('import "github.com/user/repo"')
-        self.assertIn("github.com", imports)
+        # Now returns the full import path (not just first component)
+        # so get_dependency_weight can check for heavy packages via substring
+        self.assertIn("github.com/user/repo", imports)
 
     def test_public_api_capitalized(self):
         content = 'func Foo() {}\nfunc bar() {}\ntype Bar struct{}\n'

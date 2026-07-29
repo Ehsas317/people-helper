@@ -101,7 +101,6 @@ def generate_report(
     skipped = [c for c in candidates if c.skipped]
 
     # Summary stats — help the user understand the scan at a glance
-    skipped_list = [c for c in candidates if c.skipped]
     extraction_counts = {"single": 0, "multi": 0, "blocked": 0}
     for c in active:
         if c.extraction_type in extraction_counts:
@@ -270,8 +269,9 @@ def generate_report(
                 "Swift": "swift",
             }.get(c.language, "")
             # Use 4-backtick fence so user code with triple backticks doesn't break out.
-            # Redact secrets from first_lines to avoid leaking PATs/keys in shared reports.
-            safe_first_lines = _redact_secrets(c.first_lines)
+            # CRITICAL: sanitize for markdown (escapes backticks, strips <script>, neutralizes javascript:)
+            # AND redact secrets (PATs, AWS keys, etc.) from first_lines to avoid leaking in shared reports.
+            safe_first_lines = _sanitize_for_markdown(_redact_secrets(c.first_lines))
             lines.append(f"````{lang_ext}")
             lines.append(safe_first_lines)
             lines.append("````")

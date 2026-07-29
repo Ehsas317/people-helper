@@ -48,7 +48,6 @@ SKIP_DIRS = {
     "bower_components",
     "jspm_packages",
     "test_extracted",
-    "extracted",
 }
 
 SKIP_EXTS = {

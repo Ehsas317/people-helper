@@ -195,6 +195,12 @@ Create a fine-grained PAT:
                 print(f"Note: --language={args.language} but repo's primary language is {detected}.", file=sys.stderr)
                 print(f"      Filtering to {args.language} files only.", file=sys.stderr)
 
+        # Detect license BEFORE --language filtering (LICENSE files have no
+        # language extension and would be filtered out, causing false "NO LICENSE")
+        from people_helper.detection import detect_license_in_repo
+
+        repo_has_license = detect_license_in_repo(files)
+
         if args.language:
             target_exts = {ext for ext, lang in LANG_BY_EXT.items() if lang == args.language}
             files = [f for f in files if f["ext"] in target_exts]
@@ -206,7 +212,7 @@ Create a fine-grained PAT:
 
         if args.verbose:
             print("[5/8] Detecting candidates...")
-        candidates, errored_count = detect_candidates(files, primary_language)
+        candidates, errored_count = detect_candidates(files, primary_language, repo_has_license=repo_has_license)
         active = [c for c in candidates if not c.skipped]
         if args.verbose:
             print(f"  Found {len(active)} candidates, {len(candidates) - len(active)} skipped")

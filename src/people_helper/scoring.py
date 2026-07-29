@@ -288,7 +288,7 @@ def _compute_uniqueness(similar_count: int) -> float:
 
     The caller distinguishes: network mode passes actual count (0 = truly
     unique), --no-network passes -1 to signal 'unknown'."""
-    if similar_count == -1:
+    if similar_count < 0:
         return 5.0  # Unknown — neutral, neither boost nor penalty
     if similar_count == 0:
         return 8.0
@@ -301,7 +301,8 @@ def _compute_uniqueness(similar_count: int) -> float:
 
 
 def _compute_demand_signal(cand) -> float:
-    if not cand.similar_projects:
+    # Guard against RATE_LIMITED sentinel (string) or non-list types
+    if not cand.similar_projects or not isinstance(cand.similar_projects, list):
         return 5.0
     total, weight_sum = 0.0, 0.0
     for i, proj in enumerate(cand.similar_projects):

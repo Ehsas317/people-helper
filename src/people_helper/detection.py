@@ -104,12 +104,14 @@ def _resolve_sibling(sib_name: str, parent_level: int, file_path: str, ext: str,
         if parent_level > len(p.parts):
             return None
     target_str = str(target_dir)
+
     # IMPORTANT: file paths in file_set use forward slashes (git convention).
     # On Windows, Path / operator produces backslashes, which won't match.
     # Always normalize candidate paths to forward slashes.
     def _p(*parts):
         """Join path parts and normalize to forward slashes."""
         return "/".join(str(p) for p in parts)
+
     candidates = []
     if ext == ".py":
         if target_str == ".":
@@ -210,7 +212,8 @@ def _compute_comment_ratio(content: str, ext: str) -> float:
     Uses the language handler's comment prefixes to avoid false positives
     (e.g. Python '*args' lines were being counted as block-comment continuations).
     """
-    # _compute_comment_ratio uses the module-level get_handler import — no inline re-import needed.
+    if not content:
+        return 0.0
     lines = content.splitlines()
     if not lines:
         return 0.0
@@ -362,13 +365,27 @@ def _has_project_specific_refs(content: str) -> bool:
 
 def _extract_what_it_does(docstring: str, path: str) -> str:
     if docstring:
-        for line in docstring.splitlines():
-            cleaned = re.sub(r"^[\s*/#'\"]+\s*", "", line).strip()
+        lines = docstring.splitlines()
+        for i, line in enumerate(lines):
+            cleaned = re.sub(r"^[\s*/#!'\"?]+\s*", "", line).strip()
             cleaned = cleaned.rstrip("'\"").strip()
             if not cleaned or len(cleaned) <= 5:
                 continue
+            # Skip Sphinx title underlines (~~~~ ==== ----)
             if re.match(r"^[~\-=]+$", cleaned) or cleaned.startswith("@"):
                 continue
+            # Skip copyright/license lines (not a description)
+            lower = cleaned.lower()
+            if any(
+                kw in lower
+                for kw in ("copyright", "licensed under", "license:", "permission is hereby", "all rights reserved")
+            ):
+                continue
+            # Skip if the NEXT line is a Sphinx underline (this line is a title, not description)
+            if i + 1 < len(lines):
+                next_stripped = lines[i + 1].strip()
+                if next_stripped and re.match(r"^[~\-=]+$", next_stripped):
+                    continue
             return cleaned[:200]
     return f"Source file at {path}"
 
@@ -535,11 +552,16 @@ def _build_why_extractable(cand, fan_in: int, in_cycle: bool) -> list:
 # === Main candidate detection ===
 
 
-def detect_candidates(files: list, primary_language: str):
+def detect_candidates(files: list, primary_language: str, repo_has_license: bool | None = None):
     """Detect extractable candidates from files.
 
     Returns a tuple (candidates, errored_count) where errored_count is the
     number of files that crashed during detection (silent before this fix).
+
+    If repo_has_license is provided (True/False), uses that instead of
+    auto-detecting from the file list. This fixes the bug where --language
+    filtering strips LICENSE/COPYING files from the list, causing false
+    "NO LICENSE FILE" warnings.
     """
     file_set = {f["path"] for f in files}
     project_modules = set()
@@ -557,7 +579,8 @@ def detect_candidates(files: list, primary_language: str):
     fan_in = compute_fan_in(import_graph)
     cycles = find_cycles_scc(import_graph)
     cycle_nodes = {n for cycle in cycles for n in cycle}
-    repo_has_license = detect_license_in_repo(files)
+    if repo_has_license is None:
+        repo_has_license = detect_license_in_repo(files)
 
     candidates = []
     errored_count = 0

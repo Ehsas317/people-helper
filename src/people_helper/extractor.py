@@ -249,7 +249,7 @@ def _generate_readme(name: str, candidate: Candidate, source_repo: str, tags: li
     what_it_does = candidate.what_it_does or "Extracted utility"
     tags_str = " ".join(f"`{t}`" for t in tags) if tags else "utility"
     gh_user = _get_github_username(source_repo)
-    
+
     # Language-specific installation and usage examples
     ext = Path(candidate.path).suffix.lower()
     if ext == ".py":
@@ -282,7 +282,7 @@ import "{gh_user}/{name}"
         # Fallback for other languages
         install = "(See your language's package manager)"
         usage = "(See the source file for usage examples)"
-    
+
     return f"""# {name}
 
 {what_it_does}
@@ -357,6 +357,8 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
     name = candidate.suggested_name or suggest_name(candidate)
     tags = candidate.suggested_tags or suggest_tags(candidate)
     pkg_dir = output_dir / name
+    # Track whether WE created this dir — don't rmtree pre-existing dirs on failure
+    created_here = not pkg_dir.exists()
     pkg_dir.mkdir(parents=True, exist_ok=True)
 
     try:
@@ -381,7 +383,9 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
         # Generate package manifest
         ext = Path(candidate.path).suffix.lower()
         if ext == ".py":
-            (pkg_dir / "pyproject.toml").write_text(_generate_pyproject_toml(name, candidate, tags, source_repo), encoding="utf-8")
+            (pkg_dir / "pyproject.toml").write_text(
+                _generate_pyproject_toml(name, candidate, tags, source_repo), encoding="utf-8"
+            )
             # Create __init__.py for the package (Python requires this for a
             # proper package, not just a namespace package)
             pkg_subdir = pkg_dir / name.replace("-", "_")
@@ -398,7 +402,9 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
                 if sib_file.exists():
                     shutil.move(str(sib_file), str(pkg_subdir / sib_file.name))
         elif ext in {".ts", ".tsx", ".js", ".jsx"}:
-            (pkg_dir / "package.json").write_text(_generate_package_json(name, candidate, tags, source_repo), encoding="utf-8")
+            (pkg_dir / "package.json").write_text(
+                _generate_package_json(name, candidate, tags, source_repo), encoding="utf-8"
+            )
             # Create src/ directory and move extracted file there (JS/TS convention)
             src_dir = pkg_dir / "src"
             src_dir.mkdir(exist_ok=True)
@@ -415,7 +421,9 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
             index_content = f"// Auto-generated index — adjust as needed\nexport * from './src/{main_name}';\n"
             (pkg_dir / "index.js").write_text(index_content, encoding="utf-8")
         elif ext == ".rs":
-            (pkg_dir / "Cargo.toml").write_text(_generate_cargo_toml(name, candidate, tags, source_repo), encoding="utf-8")
+            (pkg_dir / "Cargo.toml").write_text(
+                _generate_cargo_toml(name, candidate, tags, source_repo), encoding="utf-8"
+            )
             # Create src/ directory and move extracted file there (Rust convention)
             src_dir = pkg_dir / "src"
             src_dir.mkdir(exist_ok=True)
@@ -447,9 +455,10 @@ def extract_candidate(candidate: Candidate, clone_path: Path, output_dir: Path, 
                 break
 
     except Exception:
-        # CRITICAL: Clean up partial extraction dir on any failure.
-        # Without this, users would get packages with source-but-no-manifest.
-        shutil.rmtree(pkg_dir, ignore_errors=True)
+        # CRITICAL: Clean up partial extraction dir on any failure — but ONLY if we
+        # created it. Don't rmtree pre-existing dirs (would delete user's prior work).
+        if created_here:
+            shutil.rmtree(pkg_dir, ignore_errors=True)
         raise
 
     return pkg_dir
