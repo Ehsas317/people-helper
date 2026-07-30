@@ -1,0 +1,116 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "people-helper"
+version = "1.0.0"
+description = "Find code worth extracting — and verify it's actually standalone."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Ehsas317", email = "124675043+Ehsas317@users.noreply.github.com" },
+]
+keywords = [
+    "github",
+    "code-analysis",
+    "extractables",
+    "open-source",
+    "side-projects",
+    "refactoring",
+    "standalone",
+    "code-mining",
+    "static-analysis",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "httpx>=0.25,<1.0",
+]
+
+[project.optional-dependencies]
+check = [
+    # Optional: enables --check feature (not yet implemented; reserved for future use)
+    # "vulture",
+    # "bandit",
+    # "lizard",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "coverage[toml]>=7.0",
+    "mypy>=1.0",
+    "ruff>=0.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/Ehsas317/people-helper"
+Repository = "https://github.com/Ehsas317/people-helper"
+Changelog = "https://github.com/Ehsas317/people-helper/blob/main/CHANGELOG.md"
+Issues = "https://github.com/Ehsas317/people-helper/issues"
+
+[project.scripts]
+people-helper = "people_helper.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/people_helper"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/people_helper/",
+    "tests/",
+    "references/",
+    "skill/",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "PRIVACY.md",
+    "CODE_OF_CONDUCT.md",
+    "CITATION.cff",
+    "LICENSE",
+    "SKILL.md",
+    "people_helper.py",
+    ".env.example",
+    "requirements.txt",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+extend-exclude = ["tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501", "E701", "E702", "E741"]  # Long lines & single-line if: ok for this codebase
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["src/people_helper"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

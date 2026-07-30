@@ -1,0 +1,46 @@
+# Environment
+.env
+*.local
+.venv/
+venv/
+
+# Reports (often contain private info)
+report.md
+*.report.md
+*_report.md
+test_report.md
+# Exception: the issue template is named bug_report.md, not a report artifact
+!.github/ISSUE_TEMPLATE/bug_report.md
+
+# Extracted packages (often contain private source code)
+extracted/
+output/
+test_extracted/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.coverage
+.tox/
+.mypy_cache/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Build
+dist/
+build/
+*.egg-info/
+
+# Generated skill archive (build with skill/build.sh)
+*.skill
+people-helper.skill
+
