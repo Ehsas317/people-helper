@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: People Helper
+message: "If you use this software, please cite it as below."
+type: software
+authors:
+  - alias: Ehsas317
+license: MIT
+repository-code: "https://github.com/Ehsas317/people-helper"
+url: "https://github.com/Ehsas317/people-helper"
+keywords:
+  - github
+  - code-analysis
+  - extractables
+  - open-source
+  - refactoring
+  - static-analysis
+version: "1.0.0"
+date-released: "2026-07-26"
