@@ -11,10 +11,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LOC scoring: removed hard 500-LOC cutoff.** Files >500 LOC are no longer silently skipped. Instead, they get a graduated maintainability penalty: -0.1 per 150 LOC over 500 (e.g. 650 LOC → -0.1, 800 → -0.2, 950 → -0.3, 2000 → -1.0). Large but genuinely standalone files can now be detected, just with a lower score. The minimum sanity check (<10 LOC) remains.
 - **Naming heuristic smarter for generic stems.** `models.py` in `people_helper_data/` no longer suggests `people-helper-data-models` or `people-helper-data-data` — the parent directory name is used directly when the generic stem would produce a redundant suffix. Function/class names from the source file are now preferred over docstring words when both are available.
 - **Report now includes an "At a glance" summary block** showing extraction type counts (single/multi/blocked), total LOC across candidates, average cyclomatic complexity, stdlib-only ratio, and license-absence warnings.
+- `requirements.txt` — `httpx>=0.25` → `httpx>=0.25,<1.0` (upper bound prevents silent breakage when httpx 1.0 ships).
+- `README.md` — comprehensive rewrite: Quick Start, badges, corrected rate-limit claim (30/min not 5000/hour), architecture diagram with all modules, privacy section, --version/--debug documentation, venv/pipx install guidance, optional author env vars documented.
+- `people_helper.py` — refactored to delegate to `people_helper.cli.main()` (no more logic in the repo-root script).
+- `extractor.py` — extraction now PRESERVES source copyright headers (was previously stripping them, which violates MIT/Apache/BSD attribution requirements).
 
 ### Added
 - **More secret patterns auto-redacted in report previews.** Now also catches: GitHub user/server/refresh tokens (`ghu_`, `ghs_`, `ghr_`), Anthropic API keys (`sk-ant-`), Google API keys (`AIza...`), Stripe live keys (`sk_live_`/`pk_live_`), SendGrid keys, Twilio SIDs, and long high-entropy hex strings.
 - **`test_extracted/` and `extracted/` added to walker `SKIP_DIRS`** — the walker no longer scans its own test outputs (was previously scoring `test_extracted/*.py` files as real candidates when present in the repo).
+- `pyproject.toml` — PEP 621 project metadata with `[build-system]`, `[project]` (name, version, description, requires-python, license, authors, keywords, classifiers, dependencies, optional-dependencies, urls, scripts), `[tool.hatch.build]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.coverage]`.
+- `src/people_helper/__main__.py` — `python -m people_helper` entry point.
+- `src/people_helper/cli.py` — CLI `main()` function (importable by both `people_helper.py` script and `__main__.py`).
+- `src/people_helper/__init__.py` — re-exports public API (`Candidate`, `SimilarProject`, `detect_candidates`, `generate_report`, `extract_candidates`, `score_candidate`, `walk_repo`, `parse_repo_arg`, `check_pat_scope`, etc.).
+- `[project.scripts] people-helper` — console entry point (so `pip install people-helper` provides a `people-helper` shell command).
+- `SECURITY.md` — vulnerability reporting policy.
+- `PRIVACY.md` — data-flow disclosure.
+- `CODE_OF_CONDUCT.md` — Contributor Covenant.
+- `CITATION.cff` — citation metadata for academic use.
+- `.github/ISSUE_TEMPLATE/bug_report.md` — bug report template.
+- `.github/workflows/ci.yml` — CI workflow (tests on Python 3.10/3.11/3.12/3.13 × ubuntu/macos/windows).
+- `.pre-commit-config.yaml` — pre-commit hooks (ruff, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml).
+- `RATE_LIMITED` sentinel in `search.py` — distinguishes "search failed" from "search succeeded with no results".
+- `report.py` `_redact_secrets` — regex-based redaction of common secrets in code previews.
+- `report.py` `_sanitize_for_markdown` — escapes triple backticks, strips `<script>`, neutralizes `javascript:` URLs.
+- `extractor.py` `_get_author_info` — reads `PEOPLE_HELPER_AUTHOR_NAME` / `PEOPLE_HELPER_AUTHOR_EMAIL` env vars.
+- `extractor.py` `_get_github_username` — extracts owner from `source_repo` for placeholder URLs.
+- `extractor.py` `_generate_license_review` — generates LICENSE-REVIEW.md walking through 5 license scenarios.
+- `walker.py` symlink skip + `path.resolve().relative_to(root_resolved)` check.
+- `walker.py` 300-second `subprocess.run` timeout.
+- `walker.py` `.git/config` PAT scrub via `git remote set-url origin`.
+- `detection.py` `_find_skip_reason` (renamed from `_realism_check`).
+- `detection.py` `detect_candidates` now returns `(candidates, errored_count)` tuple.
+- `base.py` `get_dependency_weight` default implementation (so new handlers don't crash if they forget to override).
+- 286 unit tests (up from 253 in v1.0.0) — added coverage for symlink/path-traversal, markdown injection, secret redaction, CLI argument validation, RATE_LIMITED sentinel, and `_safe_months_since` parse-failure handling.
 
 ### Fixed
 - **Rust `///` outer doc comments now detected** (was previously only detecting `//!` inner docs). Rust libraries primarily use `///` to document functions/structs, so most Rust docstrings were silently missed.
@@ -22,9 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **TypeScript `count_public_api` now detects `interface`, `type`, `enum`, `namespace`, and `default` exports.** Previously only `function`, `class`, and `const` were matched — meaning TypeScript files full of `interface IFoo {}` exports were reported as having zero public API.
 - **C# `global using` and `using alias` now detected.** C# 10+'s `global using MyApp.Models;` was silently dropped by the import regex (which expected `using` at line start). C# 12's `using Alias = MyApp.X;` alias form was also missed.
 - **Removed stale `test_extracted/` directory from the repo** (leftover from a prior manual run) and added it to `.gitignore` so it doesn't reappear.
-
-
-### Fixed
 - **Multi-file Python extraction bug**: siblings now moved into the package subdir alongside the main file (was previously leaving siblings at the package root, breaking relative imports like `from .compat import X`).
 - **Missing `__init__.py`**: Python extractions now create a proper `__init__.py` in the package subdir (was previously only creating the directory, relying on namespace packages).
 - **Off-by-one in LOC penalty formula**: graduated penalty now uses ceiling division to correctly match the documented behavior (650 LOC → -0.1, not -0.2).
@@ -73,38 +99,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `people_helper.py` no range validation — `--max-candidates`, `--max-extract`, `--min-score` now validated.
 - `people_helper.py` top-level exception handler leaks PAT — now redacts PAT from all error messages (defense in depth).
 - `people_helper.py` no `KeyboardInterrupt` handling — now caught cleanly with exit 130.
-
-### Added
-- `pyproject.toml` — PEP 621 project metadata with `[build-system]`, `[project]` (name, version, description, requires-python, license, authors, keywords, classifiers, dependencies, optional-dependencies, urls, scripts), `[tool.hatch.build]`, `[tool.ruff]`, `[tool.mypy]`, `[tool.coverage]`.
-- `src/people_helper/__main__.py` — `python -m people_helper` entry point.
-- `src/people_helper/cli.py` — CLI `main()` function (importable by both `people_helper.py` script and `__main__.py`).
-- `src/people_helper/__init__.py` — re-exports public API (`Candidate`, `SimilarProject`, `detect_candidates`, `generate_report`, `extract_candidates`, `score_candidate`, `walk_repo`, `parse_repo_arg`, `check_pat_scope`, etc.).
-- `[project.scripts] people-helper` — console entry point (so `pip install people-helper` provides a `people-helper` shell command).
-- `SECURITY.md` — vulnerability reporting policy.
-- `PRIVACY.md` — data-flow disclosure.
-- `CODE_OF_CONDUCT.md` — Contributor Covenant.
-- `CITATION.cff` — citation metadata for academic use.
-- `.github/ISSUE_TEMPLATE/bug_report.md` — bug report template.
-- `.github/workflows/ci.yml` — CI workflow (tests on Python 3.10/3.11/3.12/3.13 × ubuntu/macos/windows).
-- `.pre-commit-config.yaml` — pre-commit hooks (ruff, end-of-file-fixer, trailing-whitespace, check-yaml, check-toml).
-- `RATE_LIMITED` sentinel in `search.py` — distinguishes "search failed" from "search succeeded with no results".
-- `report.py` `_redact_secrets` — regex-based redaction of common secrets in code previews.
-- `report.py` `_sanitize_for_markdown` — escapes triple backticks, strips `<script>`, neutralizes `javascript:` URLs.
-- `extractor.py` `_get_author_info` — reads `PEOPLE_HELPER_AUTHOR_NAME` / `PEOPLE_HELPER_AUTHOR_EMAIL` env vars.
-- `extractor.py` `_get_github_username` — extracts owner from `source_repo` for placeholder URLs.
-- `extractor.py` `_generate_license_review` — generates LICENSE-REVIEW.md walking through 5 license scenarios.
-- `walker.py` symlink skip + `path.resolve().relative_to(root_resolved)` check.
-- `walker.py` 300-second `subprocess.run` timeout.
-- `walker.py` `.git/config` PAT scrub via `git remote set-url origin`.
-- `detection.py` `_find_skip_reason` (renamed from `_realism_check`).
-- `detection.py` `detect_candidates` now returns `(candidates, errored_count)` tuple.
-- `base.py` `get_dependency_weight` default implementation (so new handlers don't crash if they forget to override).
-
-### Changed
-- `requirements.txt` — `httpx>=0.25` → `httpx>=0.25,<1.0` (upper bound prevents silent breakage when httpx 1.0 ships).
-- `README.md` — comprehensive rewrite: Quick Start, badges, corrected rate-limit claim (30/min not 5000/hour), architecture diagram with all modules, privacy section, --version/--debug documentation, venv/pipx install guidance, optional author env vars documented.
-- `people_helper.py` — refactored to delegate to `people_helper.cli.main()` (no more logic in the repo-root script).
-- `extractor.py` — extraction now PRESERVES source copyright headers (was previously stripping them, which violates MIT/Apache/BSD attribution requirements).
 
 ### Removed
 - `extractor.py` `--strip-license-headers` flag reference (the flag never existed; the function `strip_license_header` is kept for backward compat but not called by `extract_candidate`).

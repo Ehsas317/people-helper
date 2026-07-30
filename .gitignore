@@ -9,6 +9,8 @@ report.md
 *.report.md
 *_report.md
 test_report.md
+# Exception: the issue template is named bug_report.md, not a report artifact
+!.github/ISSUE_TEMPLATE/bug_report.md
 
 # Extracted packages (often contain private source code)
 extracted/

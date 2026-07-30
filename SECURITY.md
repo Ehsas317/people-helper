@@ -13,7 +13,7 @@ If you discover a security vulnerability in People Helper, please report it
 responsibly:
 
 1. **DO NOT open a public GitHub issue.**
-2. Email the maintainer at: `security@example.com` (replace with real address)
+2. Open a private security advisory at: <https://github.com/Ehsas317/people-helper/security/advisories/new>
 3. Include:
    - Description of the vulnerability
    - Steps to reproduce

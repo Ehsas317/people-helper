@@ -4,7 +4,7 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 253](https://img.shields.io/badge/tests-253%20passing-brightgreen.svg)](#testing)
+[![Tests: 286](https://img.shields.io/badge/tests-286%20passing-brightgreen.svg)](#testing)
 
 People Helper reads your GitHub repository (read-only, always), identifies self-contained components worth extracting, verifies they can actually stand on their own, searches GitHub for similar projects, and produces a structured report with scores, differentiators, and suggested names. With `--extract`, it can also copy files out and generate package scaffolds (pyproject.toml, package.json, Cargo.toml, go.mod, README, LICENSE-REVIEW.md, SOURCE-LICENSE).
 
@@ -340,7 +340,7 @@ People Helper is also packaged as an installable AI skill for Claude, GPT, Curso
 
 ## Testing
 
-253 unit tests covering all language handlers, extraction verification, scoring, search, PAT scope verification, manifest generators, security (symlink/path-traversal/markdown-injection/secret-redaction), CLI argument validation, and edge cases:
+286 unit tests covering all language handlers, extraction verification, scoring, search, PAT scope verification, manifest generators, security (symlink/path-traversal/markdown-injection/secret-redaction), CLI argument validation, and edge cases:
 
 ```bash
 python -m unittest tests.test_people_helper
@@ -368,4 +368,4 @@ See [PRIVACY.md](PRIVACY.md) for data-flow details.
 
 ## Status
 
-v1.0.0 — 253 unit tests, all passing. Battle-tested on public repos during development.
+v1.0.0 — 286 unit tests, all passing. Battle-tested on public repos during development.

@@ -4,13 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "people-helper"
-version = "1.0.1"
+version = "1.0.0"
 description = "Find code worth extracting — and verify it's actually standalone."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 authors = [
-    { name = "Ehsas317", email = "noreply@example.com" },
+    { name = "Ehsas317", email = "124675043+Ehsas317@users.noreply.github.com" },
 ]
 keywords = [
     "github",

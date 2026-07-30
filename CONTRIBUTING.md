@@ -105,9 +105,9 @@ parts of the codebase need updating too:
 
 - All tests in `tests/test_people_helper.py`
 - Run with: `python -m unittest tests.test_people_helper -v`
-- 253 tests covering all language handlers, extraction verification, scoring, search, and edge cases
+- 286 tests covering all language handlers, extraction verification, scoring, search, and edge cases
 - Tests run in <1 second
-- Coverage: ~69% (config.py, models.py at 100%; pat.py and checks.py at 0% — contributions welcome)
+- Coverage: ~69% (config.py, models.py at 100%; pat.py at 0% — contributions welcome)
 
 ## Security
 
