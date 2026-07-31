@@ -17,6 +17,7 @@ from .config import (
     FRAMEWORK_DIRS,
     FRAMEWORK_ENTRY_NAMES,
     FRAMEWORK_SPECIAL_FILES,
+    GENERATED_PATTERNS,
     LANG_BY_EXT,
     PROJECT_SPECIFIC_PATTERNS,
     UTILITY_PATTERNS,
@@ -363,7 +364,12 @@ def _has_project_specific_refs(content: str) -> bool:
 # === Realism filter ===
 
 
-def _extract_what_it_does(docstring: str, path: str) -> str:
+def _extract_what_it_does(docstring: str, path: str, content: str = "") -> str:
+    """Extract a human-readable description from a docstring or file content.
+
+    Falls back to analyzing exported declarations in the file content when
+    no docstring is available (common for Go files without package comments).
+    """
     if docstring:
         lines = docstring.splitlines()
         for i, line in enumerate(lines):
@@ -387,6 +393,171 @@ def _extract_what_it_does(docstring: str, path: str) -> str:
                 if next_stripped and re.match(r"^[~\-=]+$", next_stripped):
                     continue
             return cleaned[:200]
+
+    # Fallback: analyze file content for ANY declaration-like patterns
+    # Covers exported and unexported, all languages, to ensure no candidate
+    # falls through with just "Source file at path".
+    if content:
+        lines = content.splitlines()
+        exports = []
+        seen = set()
+        for line in lines:
+            # Go: func Name(...) — both exported and unexported
+            m = re.match(r"^\s*func\s+(\w+)\s*\(", line)
+            if m:
+                name = m.group(1)
+                if name not in seen and not name.startswith("_"):
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Go: type Name struct/interface/...
+            m = re.match(r"^\s*type\s+(\w+)\s", line)
+            if m:
+                name = m.group(1)
+                if name not in seen and not name.startswith("_"):
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Go: var/const Name
+            m = re.match(r"^\s*(?:var|const)\s+(\w+)\s", line)
+            if m:
+                name = m.group(1)
+                if name not in seen and not name.startswith("_"):
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Python: def func_name
+            m = re.match(r"^def\s+(\w+)\s*\(", line)
+            if m:
+                name = m.group(1)
+                if name not in seen and not name.startswith("_"):
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Python: class Name
+            m = re.match(r"^class\s+(\w+)\s*[:\(]", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # JS/TS: function Name(...)
+            m = re.match(r"^\s*(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # JS/TS: const Name = / const Name:
+            m = re.match(r"^\s*(?:export\s+)?const\s+(\w+)\s*[:=]", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # JS/TS: export default function
+            if re.match(r"^\s*export\s+default\s+(?:function|class)\s+(\w+)", line):
+                m = re.match(r"^\s*export\s+default\s+(?:function|class)\s+(\w+)", line)
+                if m and m.group(1) not in seen:
+                    exports.append(m.group(1))
+                    seen.add(m.group(1))
+                continue
+            # Rust: fn name(...) or fn name<T>(...)
+            m = re.match(r"^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*(?:<[^>]*>)?\s*(?:\(|$)", line)
+            if not m:
+                m = re.match(r"^\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)\s*\(", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Rust: struct Name, enum Name, trait Name
+            m = re.match(r"^\s*(?:pub\s+)?(?:struct|enum|trait)\s+(\w+)", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # Java/C#: public/private class/interface/method
+            m = re.match(r"^\s*(?:public|private|protected|static|abstract|final|sealed|open|internal)*\s*(?:class|interface|enum|record|struct)\s+(\w+)", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            m = re.match(r"^\s*(?:public|private|protected|static|abstract|final|async|override)\s+\w+\s+(\w+)\s*\(", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+            # C/C++: type Name = struct { ... }
+            m = re.match(r"^\s*typedef\s+\w+\s+(\w+)", line)
+            if m:
+                name = m.group(1)
+                if name not in seen:
+                    exports.append(name)
+                    seen.add(name)
+                continue
+        if exports:
+            export_list = ", ".join(exports[:5])
+            if len(exports) > 5:
+                export_list += f" (+{len(exports) - 5} more)"
+            return f"Exports: {export_list}"
+
+        # Ultimate fallback: describe the file by its first meaningful non-code content
+        # e.g. a file with only a package declaration, imports, or constants
+        # Try to extract any meaningful text from the file
+        meaningful = []
+        skip_patterns = (
+            r"^\s*package\s", r"^\s*import\s", r"^\s*\(", r"^\s*\{\s*$",
+            r"^\s*\}\s*$", r"^\s*$", r"^\s*//", r"^\s*#", r"^\s*\*",
+            r"^\s*use\s+", r"^\s*extern\s+", r"^\s*#\[", r"^\s*#!", r"^\s*pub\s+use",
+        )
+        for line in lines:
+            if any(re.match(p, line) for p in skip_patterns):
+                continue
+            stripped = line.strip()
+            # Skip lines that are just braces, parens, or single chars
+            if stripped in ("{", "}", "(", ")", ";") or len(stripped) <= 2:
+                continue
+            meaningful.append(stripped[:80])
+            if len(meaningful) >= 3:
+                break
+        if meaningful:
+            return " | ".join(meaningful)
+
+        # If the file has a package/module declaration, mention it
+        for line in lines:
+            m = re.match(r"^\s*package\s+(\w+)", line)
+            if m:
+                return f"Package '{m.group(1)}' — contains declarations"
+            m = re.match(r"^\s*module\s+(\S+)", line)
+            if m:
+                return f"Module '{m.group(1)}' — contains declarations"
+            m = re.match(r"^\s*(?:pub\s+)?mod\s+(\w+)", line)
+            if m:
+                return f"Rust module '{m.group(1)}' — contains declarations"
+            m = re.match(r"^\s*extern\s+crate\s+(\w+)", line)
+            if m:
+                return f"Extern crate '{m.group(1)}' — contains declarations"
+            # C/C++ preprocessor-only files (defines, ifdefs)
+            m = re.match(r"^\s*#\s*define\s+(\w+)", line)
+            if m:
+                return f"Header defines: {m.group(1)} (and more)"
+            m = re.match(r"^\s*#\s*ifdef\s+(\w+)", line)
+            if m:
+                return f"Conditional compilation for {m.group(1)}"
+        # Absolute last resort: the path
+        return f"Source file at {path}"
+
     return f"Source file at {path}"
 
 
@@ -398,6 +569,10 @@ def _find_skip_reason(content: str, ext: str, path: str, loc: int):
     lines = content.splitlines()
     total_lines = len(lines)
     name = Path(path).name
+    # Safety net: skip generated files that slipped through walker (e.g. doc.go)
+    path_lower = path.lower()
+    if any(pattern in path_lower for pattern in GENERATED_PATTERNS):
+        return "Generated/auto-generated file"
     if name == "mod.rs" and loc <= 30:
         mod_lines = sum(1 for l in lines if l.strip().startswith(("pub mod ", "pub(crate) mod ")))
         if mod_lines >= loc * 0.5:
@@ -658,6 +833,28 @@ def detect_candidates(files: list, primary_language: str, repo_has_license: bool
                     )
                 )
                 continue
+            # Skip files with extremely high fan-in (>50 importers) — they are
+            # core framework/stdlib files that are tightly coupled by virtue of
+            # how many other files depend on them. The outbound-import check
+            # above catches coupling in one direction; this catches the other.
+            file_fan_in_pre = fan_in.get(path_str, -1)
+            if file_fan_in_pre > 50:
+                candidates.append(
+                    Candidate(
+                        path=path_str,
+                        language=lang,
+                        loc=loc,
+                        has_tests=tested,
+                        has_docstring=has_doc,
+                        internal_imports=internal,
+                        external_imports=external,
+                        filename_score=fscore,
+                        skipped=True,
+                        skip_reason=f"High inbound fan-in ({file_fan_in_pre} importers) — too tightly coupled",
+                        source_has_license=repo_has_license,
+                    )
+                )
+                continue
             if fscore < -0.5:
                 candidates.append(
                     Candidate(
@@ -721,7 +918,7 @@ def detect_candidates(files: list, primary_language: str, repo_has_license: bool
             comment_ratio = _compute_comment_ratio(content, ext)
 
             first_lines = "\n".join(content.splitlines()[:30])
-            what_it_does = _extract_what_it_does(doc_snippet, path_str)
+            what_it_does = _extract_what_it_does(doc_snippet, path_str, content)
 
             cand = Candidate(
                 path=path_str,

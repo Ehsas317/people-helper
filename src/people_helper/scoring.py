@@ -70,8 +70,15 @@ def _compute_code_quality(cand) -> float:
         score += 0.5
     if cand.filename_score > 0:
         score += 0.5
+    # Fan-in: high inbound coupling is a strong negative signal
     if cand.fan_in == 0:
         score += 0.5
+    elif cand.fan_in > 50:
+        score -= 2.5
+    elif cand.fan_in > 20:
+        score -= 1.5
+    elif cand.fan_in > 10:
+        score -= 0.5
     # Extraction verification directly affects quality
     if cand.extraction_type == "single" and not cand.relative_imports:
         score += 1.0  # verified standalone = higher quality
@@ -138,6 +145,13 @@ def _compute_relevance(cand) -> float:
         score += 0.5
     if cand.internal_imports == 0:
         score += 0.5
+    # Fan-in penalty in relevance: high inbound coupling = not standalone
+    if cand.fan_in > 50:
+        score -= 2.5
+    elif cand.fan_in > 20:
+        score -= 1.5
+    elif cand.fan_in > 10:
+        score -= 0.5
     # Legal signal — no license means extraction is risky
     if not cand.source_has_license:
         score -= 1.0

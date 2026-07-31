@@ -45,6 +45,10 @@ class GoHandler(LanguageHandler):
         IMMEDIATELY BEFORE the `package` declaration. Comments BEFORE that
         (e.g. license headers) are NOT docstrings. Comments AFTER `package`
         are NOT docstrings either.
+
+        ALSO checks for doc comments on exported declarations (functions, types)
+        when no package-level docstring is found. This provides useful description
+        text for Go files that lack a package comment.
         """
         lines = content.splitlines()
         if not lines:
@@ -80,8 +84,44 @@ class GoHandler(LanguageHandler):
                 if "copyright" in l.lower() or "license" in l.lower() or "licensed" in l.lower()
             )
             if copyright_lines == len(comment_block):
-                return False, ""
-            return True, "\n".join(comment_block).strip()
+                comment_block = []
+            else:
+                return True, "\n".join(comment_block).strip()
+
+        # Fallback: look for doc comments on exported functions/types
+        # Go convention: a comment immediately before `func FooName(...)` or `type FooName`
+        # where FooName starts with uppercase is the docstring for that declaration.
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            # Check if next non-blank line is an exported declaration
+            if not stripped:
+                continue
+            # Look for exported func/type/var declaration
+            m = re.match(r"^(func|type|var)\s+([A-Z])\w*", stripped)
+            if not m:
+                continue
+            # Collect comment lines immediately before this declaration
+            decl_doc: list[str] = []
+            for j in range(i - 1, -1, -1):
+                js = lines[j].strip()
+                if js.startswith("//"):
+                    # Strip the // prefix for cleaner output
+                    decl_doc.insert(0, js[2:].strip() if js.startswith("// ") else js[2:].strip())
+                elif not js:
+                    continue
+                else:
+                    break
+            if decl_doc:
+                # Filter out license-only comment blocks
+                copyright_lines = sum(
+                    1 for l in decl_doc
+                    if "copyright" in l.lower() or "license" in l.lower() or "licensed" in l.lower()
+                )
+                if copyright_lines == len(decl_doc):
+                    continue
+                doc_text = "\n".join(decl_doc).strip()
+                return True, doc_text
+
         return False, ""
 
     # Go: can't reliably tell internal from external without go.mod module path

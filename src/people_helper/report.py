@@ -117,7 +117,7 @@ def generate_report(
         f"**Generated:** {now}",
         f"**Primary language:** {language}",
         f"**Candidates analyzed:** {len(candidates)}",
-        f"**Top candidates:** {len(active)}",
+        f"**Candidates above threshold:** {len(active)}",
     ]
     if hidden > 0:
         lines.append(f"**Filtered:** {hidden} below score {min_score}")
@@ -298,6 +298,6 @@ def generate_report(
     # emoji like ✅ ⚠ ⛔ used in the report, causing UnicodeEncodeError.
     output_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"\nReport written: {output_path}")
-    print(f"Top candidates: {len(active)}")
+    print(f"Candidates above threshold: {len(active)}")
     if active:
         print(f"Best candidate: {Path(active[0].path).name} (score {active[0].combined_score:.1f}/10)")
